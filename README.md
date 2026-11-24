@@ -20,6 +20,15 @@ Exact versions are in [`docs/VERSIONS.md`](docs/VERSIONS.md). The lockfiles `bac
 
 ## Quick start (Windows)
 
+To just see the app running now (no database, no system changes; only the project's own
+`backend\.venv` and `frontend\node_modules` are created):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\run-local.ps1
+```
+
+Full setup:
+
 First-time setup is one command. It checks prerequisites, creates `.env` with random secrets, installs pinned dependencies, sets up PostgreSQL + pgvector in WSL2, pulls and tests the models, and runs every check:
 
 ```powershell
