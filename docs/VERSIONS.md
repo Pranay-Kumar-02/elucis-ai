@@ -52,10 +52,11 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 | @radix-ui/react-slot | 1.5.0 | vitest, @vitest/coverage-v8 | 5.1.0 |
 | tw-animate-css | 1.4.0 | @testing-library/react | 16.3.3 |
 | shadcn CLI (for adding components) | 4.23.0 | jsdom | 31.0.0 |
+| @fontsource-variable/ibm-plex-sans | 5.3.0 | | |
 
 ## Verified environments
 
 | Environment | What was verified | Result |
 |---|---|---|
-| Build environment (Linux, Python 3.12.3, Node 22.23.5, PostgreSQL 18.7 + pgvector 0.8.7 built from the official source tags) | Backend lint, type check, 104 tests including real-database and job-queue tests; frontend type check, lint, format, 17 tests, production build; API and web app run together | All passed (24 Nov 2026) |
+| Build environment (Linux, Python 3.12.3, Node 22.23.5, PostgreSQL 18.7 + pgvector 0.8.7 built from the official source tags) | Backend lint, type check, 104 tests including real-database and job-queue tests; frontend type check, lint, format, 20 tests, production build; API and web app run together | All passed (24 Nov 2026) |
 | Team laptop (Windows 11 26H2, i7-13700HX, RTX 4060 8 GB, 13.7 GB RAM) | Setup scripts 10–90 | Recorded in `.setup-reports\` when the scripts run |
