@@ -3,9 +3,9 @@
   Run the app locally as it is today: FastAPI backend + React frontend, no database setup.
 
 .DESCRIPTION
-  Changes NO system-level software. It only creates the project's own dependency folders
-  if they are missing (backend\.venv via uv, frontend\node_modules via pnpm), both inside
-  this project folder, from the committed lockfiles.
+  Changes NO system-level software. It only creates or completes the project's own
+  dependency folders (backend\.venv via uv, frontend\node_modules via pnpm), both inside
+  this project folder, from the committed lockfiles. Safe to re-run after a failure.
 
   Then it opens two PowerShell windows (backend on :8000, frontend on :5173), checks that
   both answer, checks that the frontend reaches the backend through its /api proxy, writes
@@ -63,26 +63,21 @@ foreach ($port in 8000, 5173) {
 }
 
 Write-Step 'Backend environment (backend\.venv, project-local)'
-if (Test-Path (Join-Path $backend '.venv\Scripts\python.exe')) {
-    Write-Ok 'backend\.venv exists.'
-} else {
-    Write-Info 'Creating backend\.venv from uv.lock (uses the uv-managed Python 3.12 already on this PC) ...'
-    $code = Invoke-Native 'uv' @('sync', '--frozen', '--no-python-downloads') -WorkingDirectory $backend
-    if ($code -ne 0) { Stop-WithReport "uv sync failed (exit $code). Messages above show why." }
-    Write-Ok 'backend\.venv created.'
-}
+# Always run uv sync: it is a quick no-op when the venv already matches uv.lock, and it
+# resumes safely after an interrupted run (a venv folder alone does not mean it is complete).
+Write-Info 'Syncing backend\.venv with uv.lock (uses the uv-managed Python 3.12 already on this PC) ...'
+$code = Invoke-Native 'uv' @('sync', '--frozen', '--no-python-downloads') -WorkingDirectory $backend
+if ($code -ne 0) { Stop-WithReport "uv sync failed (exit $code). Messages above show why; diag-network.ps1 checks downloads." }
+Write-Ok 'backend\.venv matches uv.lock.'
 $report.steps.python = Get-NativeOutput (Join-Path $backend '.venv\Scripts\python.exe') @('--version')
 Write-Info "Python in venv: $($report.steps.python)"
 
 Write-Step 'Frontend dependencies (frontend\node_modules, project-local)'
-if (Test-Path (Join-Path $frontend 'node_modules\vite\bin\vite.js')) {
-    Write-Ok 'frontend\node_modules exists.'
-} else {
-    Write-Info 'Installing from pnpm-lock.yaml (engine check relaxed for this run only) ...'
-    $code = Invoke-Native 'pnpm' @('install', '--frozen-lockfile', '--config.engine-strict=false') -WorkingDirectory $frontend
-    if ($code -ne 0) { Stop-WithReport "pnpm install failed (exit $code). Messages above show why." }
-    Write-Ok 'frontend\node_modules installed.'
-}
+# Same reasoning: pnpm install --frozen-lockfile is a no-op when node_modules is complete.
+Write-Info 'Syncing frontend\node_modules with pnpm-lock.yaml (engine check relaxed for this run only) ...'
+$code = Invoke-Native 'pnpm' @('install', '--frozen-lockfile', '--config.engine-strict=false') -WorkingDirectory $frontend
+if ($code -ne 0) { Stop-WithReport "pnpm install failed (exit $code). Messages above show why; diag-network.ps1 checks downloads." }
+Write-Ok 'frontend\node_modules matches pnpm-lock.yaml.'
 
 Write-Step 'Starting the backend (new window, port 8000)'
 # Dev endpoints on for this run; no .env and no database yet, so DB checks say "not configured".
