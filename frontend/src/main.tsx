@@ -6,12 +6,9 @@ import { RouterProvider } from "react-router/dom";
 
 import { AppProviders } from "@/app/providers";
 import { router } from "@/app/router";
+import { initTheme } from "@/lib/theme";
 
-// Follow the operating-system colour scheme.
-const dark = window.matchMedia("(prefers-color-scheme: dark)");
-const applyTheme = () => document.documentElement.classList.toggle("dark", dark.matches);
-applyTheme();
-dark.addEventListener("change", applyTheme);
+initTheme();
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element #root not found");

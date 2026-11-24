@@ -1,70 +1,78 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
 
-/* Dark mode follows a `.dark` class on <html> (set from the OS preference in main.tsx). */
+/* Dark mode follows a `.dark` class on <html> (theme.ts sets it from the user's choice). */
 @custom-variant dark (&:is(.dark *));
 
-/* Design tokens (shadcn/ui CSS-variable convention, OKLCH colours). */
+/*
+ * Design tokens (shadcn/ui variable names).
+ * Lagoon is the brand colour: actions, selection, focus. Marigold is reserved for
+ * evidence and attention. Neutrals are cool and quiet so data stays the loudest thing.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.985 0.002 247);
-  --foreground: oklch(0.21 0.03 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.03 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.03 264);
-  --primary: oklch(0.42 0.11 250);
-  --primary-foreground: oklch(0.98 0.005 247);
-  --secondary: oklch(0.955 0.01 250);
-  --secondary-foreground: oklch(0.25 0.04 260);
-  --muted: oklch(0.955 0.008 250);
-  --muted-foreground: oklch(0.5 0.03 257);
-  --accent: oklch(0.94 0.02 250);
-  --accent-foreground: oklch(0.25 0.04 260);
-  --destructive: oklch(0.58 0.22 27);
-  --success: oklch(0.6 0.14 155);
-  --warning: oklch(0.76 0.15 75);
-  --border: oklch(0.91 0.01 255);
-  --input: oklch(0.91 0.01 255);
-  --ring: oklch(0.55 0.12 250);
-  --sidebar: oklch(0.975 0.004 250);
-  --sidebar-foreground: oklch(0.3 0.03 262);
-  --sidebar-border: oklch(0.91 0.01 255);
+  --radius: 0.5rem;
+  --background: #f5f6f8;
+  --foreground: #1b2230;
+  --card: #ffffff;
+  --card-foreground: #1b2230;
+  --popover: #ffffff;
+  --popover-foreground: #1b2230;
+  --primary: #0e6f7c;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f4;
+  --secondary-foreground: #263041;
+  --muted: #eef1f4;
+  --muted-foreground: #5d6777;
+  --accent: #e8f1f2;
+  --accent-foreground: #0b4f58;
+  --destructive: #c2413a;
+  --success: #1f8a5b;
+  --warning: #b7791f;
+  --evidence: #c98a04;
+  --border: #e2e5ea;
+  --input: #d7dbe2;
+  --ring: #0e6f7c;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3a4456;
+  --sidebar-border: #e2e5ea;
 }
 
 .dark {
-  --background: oklch(0.17 0.02 262);
-  --foreground: oklch(0.96 0.006 250);
-  --card: oklch(0.21 0.024 262);
-  --card-foreground: oklch(0.96 0.006 250);
-  --popover: oklch(0.21 0.024 262);
-  --popover-foreground: oklch(0.96 0.006 250);
-  --primary: oklch(0.72 0.12 245);
-  --primary-foreground: oklch(0.18 0.03 262);
-  --secondary: oklch(0.27 0.025 262);
-  --secondary-foreground: oklch(0.96 0.006 250);
-  --muted: oklch(0.27 0.025 262);
-  --muted-foreground: oklch(0.72 0.02 255);
-  --accent: oklch(0.3 0.03 258);
-  --accent-foreground: oklch(0.96 0.006 250);
-  --destructive: oklch(0.65 0.2 25);
-  --success: oklch(0.7 0.14 155);
-  --warning: oklch(0.8 0.14 80);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.6 0.1 250);
-  --sidebar: oklch(0.19 0.022 262);
-  --sidebar-foreground: oklch(0.9 0.01 250);
-  --sidebar-border: oklch(1 0 0 / 9%);
+  --background: #0f141b;
+  --foreground: #e6e9ee;
+  --card: #151b24;
+  --card-foreground: #e6e9ee;
+  --popover: #151b24;
+  --popover-foreground: #e6e9ee;
+  --primary: #3fb4c1;
+  --primary-foreground: #04262b;
+  --secondary: #1c2430;
+  --secondary-foreground: #e6e9ee;
+  --muted: #1c2430;
+  --muted-foreground: #97a1b0;
+  --accent: #17303a;
+  --accent-foreground: #a8e3ea;
+  --destructive: #e5675f;
+  --success: #45c08a;
+  --warning: #e0a94a;
+  --evidence: #f0b429;
+  --border: #242d3a;
+  --input: #2d3747;
+  --ring: #3fb4c1;
+  --sidebar: #121821;
+  --sidebar-foreground: #c3cad5;
+  --sidebar-border: #202834;
 }
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans:
+    "IBM Plex Sans Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -82,6 +90,7 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-evidence: var(--evidence);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -94,7 +103,26 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-feature-settings: "ss01", "cv11";
+  }
   body {
     @apply bg-background text-foreground antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  /* Figures in tables and stats line up. */
+  table,
+  dd,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

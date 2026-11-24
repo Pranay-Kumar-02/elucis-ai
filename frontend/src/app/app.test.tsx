@@ -25,36 +25,102 @@ const adapters = [
   },
 ];
 
+const noDatabase = {
+  ...healthyResponse,
+  status: "unavailable",
+  checks: {
+    ...healthyResponse.checks,
+    database: {
+      status: "unavailable",
+      latency_ms: null,
+      detail: "The database is not configured (DATABASE_URL).",
+    },
+    model_runtime: { status: "unavailable", latency_ms: 3, detail: "model not pulled: qwen3:4b" },
+  },
+};
+
 describe("application shell", () => {
-  it("renders navigation and the dashboard with live health", async () => {
+  it("shows product branding only, never internal project labels", async () => {
+    mockFetch({ "/api/v1/health": () => json(noDatabase, 503) });
+    renderRoute("/");
+    expect(
+      await screen.findByRole("heading", { name: "Welcome to PM Copilot" }),
+    ).toBeInTheDocument();
+    const text = document.body.textContent;
+    for (const internal of [
+      "Group 2",
+      "Z-5-1",
+      "Batch",
+      "development build",
+      "Developer",
+      "Milestone",
+    ]) {
+      expect(text).not.toContain(internal);
+    }
+  });
+
+  it("lists every D12 section and only links the ones that work", () => {
     mockFetch({ "/api/v1/health": () => json(healthyResponse) });
     renderRoute("/");
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getByRole("link", { name: "File preview" })).toHaveAttribute(
-      "href",
-      "/dev/file-preview",
-    );
-    expect(await screen.findAllByText("Degraded")).not.toHaveLength(0);
-    expect(screen.getByText("Database (PostgreSQL + pgvector)")).toBeInTheDocument();
-    expect(screen.getByText("Not set up yet")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
+    expect(within(nav).getByRole("link", { name: "Imports" })).toHaveAttribute("href", "/imports");
+    for (const planned of [
+      "Themes",
+      "Requests",
+      "Review",
+      "Opportunities",
+      "Documents",
+      "Roadmap",
+      "Assistant",
+    ]) {
+      expect(within(nav).queryByRole("link", { name: planned })).toBeNull();
+      expect(within(nav).getByText(planned)).toHaveAttribute("aria-disabled", "true");
+    }
   });
 
-  it("shows when the API is unreachable", async () => {
+  it("summarises service health and explains why AI is paused", async () => {
+    mockFetch({ "/api/v1/health": () => json(noDatabase, 503) });
+    renderRoute("/");
+    expect(await screen.findByRole("link", { name: "Database not connected" })).toHaveAttribute(
+      "href",
+      "/settings/system",
+    );
+    expect(
+      screen.getByText(/The qwen3:4b model isn't installed on this machine yet\./, {
+        selector: "span",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("0 of 3 complete")).toBeInTheDocument();
+  });
+
+  it("says when the server cannot be reached", async () => {
     mockFetch({ "/api/v1/health": () => Promise.reject(new TypeError("Failed to fetch")) });
     renderRoute("/");
-    expect(await screen.findByText(/API is not reachable/)).toBeInTheDocument();
+    expect(await screen.findByText("Server not reachable")).toBeInTheDocument();
+    expect(screen.getByText(/The server isn't responding/)).toBeInTheDocument();
   });
 
-  it("renders a 404 page for unknown routes", () => {
+  it("renders a not-found page", () => {
     mockFetch({ "/api/v1/health": () => json(healthyResponse) });
     renderRoute("/does-not-exist");
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
   });
 });
 
+describe("redirects", () => {
+  it("sends earlier development paths to their product pages", async () => {
+    mockFetch({
+      "/api/v1/health": () => json(healthyResponse),
+      "/api/v1/dev/sources/adapters": () => json(adapters),
+    });
+    renderRoute("/dev/file-preview");
+    expect(await screen.findByRole("heading", { name: "Imports" })).toBeInTheDocument();
+  });
+});
+
 describe("system status page", () => {
-  it("shows database and model runtime details", async () => {
+  it("shows database and AI runtime details from the API", async () => {
     mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/health/database": () =>
@@ -72,55 +138,61 @@ describe("system status page", () => {
           {
             status: "unavailable",
             latency_ms: 3,
-            ollama_version: null,
-            models: null,
-            detail: "not reachable",
+            ollama_version: "0.40.4",
+            models: { "qwen3:4b": false, "qwen3-embedding:0.6b": true },
+            detail: "model not pulled: qwen3:4b",
           },
           503,
         ),
     });
-    renderRoute("/system");
+    renderRoute("/settings/system");
     expect(await screen.findByText("18.7")).toBeInTheDocument();
-    expect(screen.getByText("0.8.7")).toBeInTheDocument();
-    expect(await screen.findByText("not reachable")).toBeInTheDocument();
+    expect(screen.getByText("pgvector 0.8.7")).toBeInTheDocument();
+    expect(await screen.findByText("Not installed")).toBeInTheDocument();
+    expect(screen.getByText("Installed")).toBeInTheDocument();
   });
 });
 
-describe("file preview page", () => {
-  it("uploads a file and shows the detected preview", async () => {
-    const fetchMock = mockFetch({
-      "/api/v1/health": () => json(healthyResponse),
-      "/api/v1/dev/sources/adapters": () => json(adapters),
-      "/api/v1/dev/sources/preview": () =>
-        json({
-          original_filename: "reviews.csv",
-          size_bytes: 150,
-          sha256: "ab".repeat(32),
-          detected_format: "csv",
-          detected_encoding: "utf-8",
-          csv_delimiter: ",",
-          transcript_mode: null,
-          columns: ["id", "review"],
-          preview_rows: [
-            ["1", "App crashes"],
-            ["2", "Add dark mode"],
-          ],
-          total_rows: 2,
-          warnings: ["1 row(s) have a different number of values than the header."],
-        }),
-    });
-    renderRoute("/dev/file-preview");
-    expect(await screen.findByText("Zendesk tickets")).toBeInTheDocument();
-    expect(screen.getByText("Implemented")).toBeInTheDocument();
+describe("imports page", () => {
+  const preview = {
+    original_filename: "reviews.csv",
+    size_bytes: 150,
+    sha256: "ab".repeat(32),
+    detected_format: "csv",
+    detected_encoding: "utf-8",
+    csv_delimiter: ",",
+    transcript_mode: null,
+    columns: ["id", "review"],
+    preview_rows: [
+      ["1", "App crashes"],
+      ["2", ""],
+    ],
+    total_rows: 2,
+    warnings: ["1 row(s) have a different number of values than the header."],
+  };
 
-    const input = screen.getByLabelText(/choose a file/i);
+  it("checks a file through the backend and shows the detected preview", async () => {
+    const fetchMock = mockFetch({
+      "/api/v1/health": () => json(noDatabase, 503),
+      "/api/v1/dev/sources/adapters": () => json(adapters),
+      "/api/v1/dev/sources/preview": () => json(preview),
+    });
+    renderRoute("/imports");
+    expect(await screen.findByText("Zendesk tickets")).toBeInTheDocument();
+    expect(screen.getByText("Available")).toBeInTheDocument();
+    expect(screen.getByText("Planned")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Importing starts once the database is connected"),
+    ).toBeInTheDocument();
+
     await userEvent.upload(
-      input,
+      screen.getByLabelText(/choose a file/i),
       new File(["id,review\n1,App crashes\n"], "reviews.csv", { type: "text/csv" }),
     );
-
     expect(await screen.findByText("App crashes")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "review" })).toBeInTheDocument();
+    expect(screen.getByText("Comma")).toBeInTheDocument();
+    expect(screen.getByText("empty")).toBeInTheDocument();
     expect(screen.getByText(/different number of values/)).toBeInTheDocument();
     const call = fetchMock.mock.calls.find(([u]) =>
       requestPath(u).endsWith("/dev/sources/preview"),
@@ -129,7 +201,7 @@ describe("file preview page", () => {
     expect(call?.[1]?.body).toBeInstanceOf(FormData);
   });
 
-  it("shows the server error message and request ID", async () => {
+  it("shows the server's reason and a reference when a file is rejected", async () => {
     mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
@@ -137,38 +209,42 @@ describe("file preview page", () => {
         json(
           {
             error: {
-              code: "unsupported_format",
-              message: "Only CSV, JSON and TXT files are supported.",
+              code: "validation_failed",
+              message: "The file is not valid JSON (line 1, column 2).",
               details: [],
               request_id: "01REQ",
             },
           },
-          415,
+          422,
         ),
     });
-    renderRoute("/dev/file-preview");
+    renderRoute("/imports");
     await userEvent.upload(
       screen.getByLabelText(/choose a file/i),
-      new File(["x"], "notes.txt", { type: "text/plain" }),
+      new File(["{"], "bad.json", { type: "application/json" }),
     );
     expect(
-      await screen.findByText("Only CSV, JSON and TXT files are supported."),
+      await screen.findByText("The file is not valid JSON (line 1, column 2)."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Request ID: 01REQ")).toBeInTheDocument();
+    expect(screen.getByText("Reference: 01REQ")).toBeInTheDocument();
   });
 
-  it("rejects files over 20 MB before uploading", async () => {
+  it("rejects unsupported and oversized files before uploading", async () => {
     const fetchMock = mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
     });
-    renderRoute("/dev/file-preview");
+    renderRoute("/imports");
     const big = new File(["x"], "big.csv", { type: "text/csv" });
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     await userEvent.upload(screen.getByLabelText(/choose a file/i), big);
     await waitFor(() => {
-      expect(screen.getByText(/the limit is 20 MB/)).toBeInTheDocument();
+      expect(screen.getByText(/Files can be up to 20 MB/)).toBeInTheDocument();
     });
+    await userEvent.upload(screen.getByLabelText(/choose a file/i), new File(["x"], "sheet.xlsx"), {
+      applyAccept: false,
+    });
+    expect(await screen.findByText(/isn't a CSV, JSON or text file/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([u]) => requestPath(u).endsWith("/preview"))).toBe(false);
   });
 });

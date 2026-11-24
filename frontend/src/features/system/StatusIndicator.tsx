@@ -1,26 +1,31 @@
-import { cn } from "@/lib/utils";
-import { useHealth } from "@/features/system/queries";
-import { overallLabel } from "@/features/system/status";
+import { Link } from "react-router";
 
-const dot: Record<string, string> = {
+import { useHealth } from "@/features/system/queries";
+import { serviceSummary, type Tone } from "@/features/system/status";
+import { cn } from "@/lib/utils";
+
+const dot: Record<Tone, string> = {
   success: "bg-success",
   warning: "bg-warning",
   destructive: "bg-destructive",
   secondary: "bg-muted-foreground",
 };
 
-/** Small live indicator of backend readiness (polls GET /api/v1/health). */
-export function StatusIndicator({ compact = false }: { compact?: boolean }) {
-  const { data, isPending, isError } = useHealth();
-  const state = isPending
-    ? { label: "Checking…", tone: "secondary" }
-    : isError
-      ? { label: "API not reachable", tone: "destructive" }
-      : overallLabel[data.status];
+/** Live service summary (polls GET /api/v1/health); opens System status. */
+export function StatusIndicator({ className }: { className?: string }) {
+  const { data, isError } = useHealth();
+  const state = serviceSummary(data, isError);
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+    <Link
+      to="/settings/system"
+      aria-live="polite"
+      className={cn(
+        "inline-flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+        className,
+      )}
+    >
       <span className={cn("size-2 rounded-full", dot[state.tone])} aria-hidden />
-      {compact ? <span className="sr-only">{state.label}</span> : <span>{state.label}</span>}
-    </div>
+      {state.label}
+    </Link>
   );
 }

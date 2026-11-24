@@ -1,143 +1,161 @@
-import { Database, Cpu, RefreshCw, Workflow } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDatabaseHealth, useHealth, useModelRuntimeHealth } from "@/features/system/queries";
-import { checkLabel } from "@/features/system/status";
+import { aiPausedReason, checkLabel } from "@/features/system/status";
+import type { CheckStatus } from "@/lib/api/types";
 
-function Row({ label, value }: { label: string; value: ReactNode }) {
+function ServiceRow({
+  name,
+  purpose,
+  status,
+  statusLabel,
+  loading,
+  children,
+}: {
+  name: string;
+  purpose: string;
+  status: CheckStatus | undefined;
+  statusLabel?: string | undefined;
+  loading: boolean;
+  children?: ReactNode;
+}) {
   return (
-    <div className="flex justify-between gap-4 py-1.5 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value ?? "—"}</dd>
-    </div>
+    <li className="grid gap-4 px-6 py-5 md:grid-cols-[17rem_minmax(0,1fr)]">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-semibold">{name}</h2>
+          {status && (
+            <Badge variant={checkLabel[status].tone}>
+              {statusLabel ?? checkLabel[status].label}
+            </Badge>
+          )}
+        </div>
+        <p className="mt-1 text-[13px] text-muted-foreground">{purpose}</p>
+      </div>
+      <div className="min-w-0">{loading ? <Skeleton className="h-16" /> : children}</div>
+    </li>
   );
 }
 
+function Facts({ items }: { items: [string, ReactNode][] }) {
+  const shown = items.filter(([, v]) => v !== null && v !== undefined && v !== "");
+  if (shown.length === 0) return null;
+  return (
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-1.5 text-[13px]">
+      {shown.map(([label, value]) => (
+        <div key={label} className="contents">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="font-medium break-words">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Settings › System status: live checks of everything the product depends on. */
 export function SystemStatusPage() {
   const overall = useHealth();
   const db = useDatabaseHealth();
   const model = useModelRuntimeHealth();
+  const worker = overall.data?.checks["worker"];
+  const refreshing = overall.isFetching || db.isFetching || model.isFetching;
   const refresh = () => {
     void overall.refetch();
     void db.refetch();
     void model.refetch();
   };
+  const aiReason = aiPausedReason(model.data);
 
   return (
     <>
       <PageHeader
         title="System status"
-        description="Live checks of the services this application depends on."
+        description="Live checks of the services the product depends on. Refreshes every 30 seconds."
         actions={
-          <Button variant="outline" size="sm" onClick={refresh}>
-            <RefreshCw aria-hidden /> Refresh
+          <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>
+            <RefreshCw className={refreshing ? "animate-spin" : undefined} aria-hidden />
+            Refresh
           </Button>
         }
       />
       {overall.isError && (
         <Alert variant="destructive" className="mb-6">
-          <AlertTitle>The API is not reachable</AlertTitle>
+          <AlertTitle>The server isn't responding</AlertTitle>
           <AlertDescription>Start the backend, then refresh this page.</AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="size-4" aria-hidden /> Database
-            </CardTitle>
-            <CardDescription>PostgreSQL with pgvector</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {db.isPending ? (
-              <Skeleton className="h-24" />
-            ) : db.data ? (
-              <dl>
-                <Row
-                  label="Status"
-                  value={
-                    <Badge variant={checkLabel[db.data.status].tone}>
-                      {checkLabel[db.data.status].label}
-                    </Badge>
-                  }
-                />
-                <Row label="PostgreSQL" value={db.data.server_version} />
-                <Row label="pgvector" value={db.data.pgvector_version} />
-                <Row label="Database" value={db.data.database} />
-                <Row
-                  label="Latency"
-                  value={db.data.latency_ms !== null ? `${db.data.latency_ms} ms` : null}
-                />
-                {db.data.detail && <Row label="Detail" value={db.data.detail} />}
-              </dl>
-            ) : (
-              <p className="text-sm text-muted-foreground">No data.</p>
+      <ul className="divide-y rounded-xl border bg-card">
+        <ServiceRow
+          name="Database"
+          purpose="Stores feedback, analysis results and decisions."
+          status={db.data?.status}
+          statusLabel={db.data && db.data.status !== "ok" ? "Not connected" : undefined}
+          loading={db.isPending}
+        >
+          {db.data?.status === "ok" ? (
+            <Facts
+              items={[
+                ["PostgreSQL", db.data.server_version],
+                [
+                  "Vector search",
+                  db.data.pgvector_version && `pgvector ${db.data.pgvector_version}`,
+                ],
+                ["Database", db.data.database],
+                ["Response time", db.data.latency_ms !== null ? `${db.data.latency_ms} ms` : null],
+              ]}
+            />
+          ) : (
+            <p className="text-[13px]">
+              Feedback can't be imported or analysed until an administrator connects PostgreSQL.
+            </p>
+          )}
+        </ServiceRow>
+        <ServiceRow
+          name="AI runtime"
+          purpose="Runs the local models for classification, themes and drafting."
+          status={model.data?.status}
+          loading={model.isPending}
+        >
+          <div className="space-y-3">
+            {aiReason && (
+              <p className="text-[13px]">{aiReason} AI features stay paused until then.</p>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Cpu className="size-4" aria-hidden /> Model runtime
-            </CardTitle>
-            <CardDescription>Ollama on this machine</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {model.isPending ? (
-              <Skeleton className="h-24" />
-            ) : model.data ? (
-              <dl>
-                <Row
-                  label="Status"
-                  value={
-                    <Badge variant={checkLabel[model.data.status].tone}>
-                      {checkLabel[model.data.status].label}
-                    </Badge>
-                  }
-                />
-                <Row label="Ollama" value={model.data.ollama_version} />
-                {Object.entries(model.data.models ?? {}).map(([name, present]) => (
-                  <Row key={name} label={name} value={present ? "installed" : "not pulled"} />
-                ))}
-                {model.data.detail && <Row label="Detail" value={model.data.detail} />}
-              </dl>
-            ) : (
-              <p className="text-sm text-muted-foreground">No data.</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Workflow className="size-4" aria-hidden /> Background worker
-            </CardTitle>
-            <CardDescription>PostgreSQL job queue</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {overall.data?.checks["worker"] ? (
-              <dl>
-                <Row
-                  label="Status"
-                  value={
-                    <Badge variant={checkLabel[overall.data.checks["worker"].status].tone}>
-                      {checkLabel[overall.data.checks["worker"].status].label}
-                    </Badge>
-                  }
-                />
-                <Row label="Detail" value={overall.data.checks["worker"].detail} />
-              </dl>
-            ) : (
-              <Skeleton className="h-24" />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <Facts
+              items={[
+                ["Ollama", model.data?.ollama_version],
+                ...Object.entries(model.data?.models ?? {}).map(
+                  ([name, present]): [string, ReactNode] => [
+                    name,
+                    present ? "Installed" : "Not installed",
+                  ],
+                ),
+                [
+                  "Response time",
+                  model.data?.latency_ms != null ? `${model.data.latency_ms} ms` : null,
+                ],
+              ]}
+            />
+          </div>
+        </ServiceRow>
+        <ServiceRow
+          name="Background processing"
+          purpose="Runs imports, analysis and document generation without blocking you."
+          status={worker?.status}
+          loading={overall.isPending}
+        >
+          <p className="text-[13px]">
+            {worker?.status === "ok"
+              ? "Processing jobs normally."
+              : "Starts working once the database is connected and its tables are created."}
+          </p>
+        </ServiceRow>
+      </ul>
     </>
   );
 }

@@ -1,95 +1,149 @@
-import { ArrowRight, CheckCircle2, CircleDashed } from "lucide-react";
+import { CheckCircle2, CircleAlert, CircleDashed } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { product } from "@/config/product";
 import { useHealth } from "@/features/system/queries";
-import { checkLabel, checkNames, overallLabel } from "@/features/system/status";
+import { aiPausedReason } from "@/features/system/status";
+import { cn } from "@/lib/utils";
 
-/** Foundation progress shown honestly: what is built now and what the next tasks deliver. */
-const milestones = [
-  { label: "Environment, backend and frontend foundation", done: true },
-  { label: "File source adapter: CSV, JSON, TXT detection and preview", done: true },
-  { label: "Database schema (54 tables, D07/D08) and migrations", done: false },
-  { label: "Authentication and workspaces (Module 1)", done: false },
-  { label: "Import pipeline with reconciliation report (Module 2)", done: false },
-];
+type StepState = "done" | "action" | "waiting";
 
+interface SetupStep {
+  title: string;
+  detail: string;
+  state: StepState;
+  action?: ReactNode;
+}
+
+const stateMeta: Record<
+  StepState,
+  { icon: typeof CheckCircle2; label: string; className: string }
+> = {
+  done: { icon: CheckCircle2, label: "Done", className: "text-success" },
+  action: { icon: CircleAlert, label: "Needs attention", className: "text-warning" },
+  waiting: {
+    icon: CircleDashed,
+    label: "Waiting on an earlier step",
+    className: "text-muted-foreground",
+  },
+};
+
+/**
+ * Dashboard (UI-11). There is no workspace data yet, so this is the empty state D12 §4
+ * asks for: explain why it is empty and offer the next action. Every status shown comes
+ * from the live health endpoint; nothing here is sample data.
+ */
 export function DashboardPage() {
   const health = useHealth();
+  const db = health.data?.checks["database"];
+  const ai = health.data?.checks["model_runtime"];
+  const dbReady = db?.status === "ok";
+  const aiReason = aiPausedReason(ai);
+
+  const steps: SetupStep[] = [
+    {
+      title: "Connect the database",
+      detail: dbReady
+        ? "Feedback, analysis results and decisions are stored securely."
+        : "Needed to store feedback, analysis results and decisions. An administrator sets this up once.",
+      state: dbReady ? "done" : "action",
+    },
+    {
+      title: "Install the AI models",
+      detail: aiReason
+        ? `${aiReason} Classification, themes and document drafting need it.`
+        : "The local models are installed and responding.",
+      state: aiReason ? "action" : "done",
+    },
+    {
+      title: "Import your first feedback",
+      detail: dbReady
+        ? "Upload reviews, tickets or interview notes as CSV, JSON or text."
+        : "You can check a file's format and columns now. Importing starts once the database is connected.",
+      state: dbReady ? "action" : "waiting",
+      action: (
+        <Button asChild size="sm" variant="outline">
+          <Link to="/imports">{dbReady ? "Import feedback" : "Check a file"}</Link>
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <>
-      <PageHeader
-        title="Dashboard"
-        description="Pain points, trends and top opportunities appear here after the first import is analysed."
-      />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>System readiness</CardTitle>
-            <CardDescription>From GET /api/v1/health</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {health.isPending && <Skeleton className="h-20" />}
-            {health.isError && (
-              <p className="text-sm text-destructive">
-                The API is not reachable. Start the backend.
-              </p>
-            )}
-            {health.data && (
-              <>
-                <Badge variant={overallLabel[health.data.status].tone}>
-                  {overallLabel[health.data.status].label}
-                </Badge>
-                <ul className="space-y-2">
-                  {Object.entries(health.data.checks).map(([name, check]) => (
-                    <li key={name} className="flex items-center justify-between text-sm">
-                      <span>{checkNames[name] ?? name}</span>
-                      <Badge variant={checkLabel[check.status].tone}>
-                        {checkLabel[check.status].label}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <Button asChild variant="link" className="px-0">
-              <Link to="/system">
-                Details <ArrowRight aria-hidden />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Build progress</CardTitle>
-            <CardDescription>Milestone 1 (weeks 1–2)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {milestones.map((m) => (
-                <li key={m.label} className="flex items-start gap-2 text-sm">
-                  {m.done ? (
-                    <CheckCircle2
-                      className="mt-0.5 size-4 shrink-0 text-success"
-                      aria-label="done"
+    <div className="space-y-10">
+      <section className="max-w-2xl">
+        <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.02em]">
+          Welcome to {product.name}
+        </h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-muted-foreground">
+          Import customer feedback to see the pain points, trends and opportunities worth building
+          next. Every figure links back to the feedback behind it, so each decision has evidence.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button asChild>
+            <Link to="/imports">Import feedback</Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link to="/settings/system">View system status</Link>
+          </Button>
+        </div>
+      </section>
+
+      <section aria-labelledby="setup-heading" className="rounded-xl border bg-card">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-6 py-4">
+          <h2 id="setup-heading" className="text-[15px] font-semibold">
+            Set up your workspace
+          </h2>
+          {health.data && (
+            <p className="text-[13px] text-muted-foreground">
+              {steps.filter((s) => s.state === "done").length} of {steps.length} complete
+            </p>
+          )}
+        </div>
+        {health.isPending ? (
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+          </div>
+        ) : health.isError ? (
+          <p className="px-6 py-5 text-destructive">
+            The server isn't responding, so setup status can't be checked. Start the backend and
+            reload.
+          </p>
+        ) : (
+          <ol className="divide-y">
+            {steps.map((step, index) => {
+              const meta = stateMeta[step.state];
+              const Icon = meta.icon;
+              return (
+                <li
+                  key={step.title}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-3 px-6 py-4"
+                >
+                  <div className="flex min-w-0 flex-1 basis-72 items-start gap-3">
+                    <span className="tabular mt-0.5 w-4 text-[13px] text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <Icon
+                      className={cn("mt-0.5 size-5 shrink-0", meta.className)}
+                      aria-label={meta.label}
                     />
-                  ) : (
-                    <CircleDashed
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                      aria-label="next"
-                    />
-                  )}
-                  <span className={m.done ? "" : "text-muted-foreground"}>{m.label}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium">{step.title}</p>
+                      <p className="text-[13px] text-muted-foreground">{step.detail}</p>
+                    </div>
+                  </div>
+                  {step.action}
                 </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+    </div>
   );
 }
