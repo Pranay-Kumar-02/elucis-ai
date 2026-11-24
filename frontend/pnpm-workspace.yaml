@@ -1,0 +1,12 @@
+# Single-package workspace file: holds pnpm settings (pnpm 10+ reads them from here).
+packages:
+  - "."
+
+# Supply-chain cooldown: refuse releases younger than 14 days (in minutes).
+minimumReleaseAge: 20160
+# Fail instead of warn when Node.js does not satisfy package "engines".
+engineStrict: true
+# Dependency install scripts are blocked unless listed here (pnpm default since v10).
+onlyBuiltDependencies: []
+# Exact versions when adding packages; the lockfile is the source of truth.
+savePrefix: ""

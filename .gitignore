@@ -1,0 +1,45 @@
+# ---- secrets: never commit ----
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+*.pem
+*.key
+
+# ---- local data and machine reports ----
+data/
+.setup-reports/
+*.dump
+*.sql.gz
+pgdata/
+
+# ---- Python ----
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+
+# ---- Node / frontend ----
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+.vite/
+
+# ---- editors and OS ----
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+Thumbs.db
+.DS_Store
+desktop.ini

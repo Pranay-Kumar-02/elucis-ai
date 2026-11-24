@@ -1,0 +1,5 @@
+[
+  {"ticket_id": "T-1", "body": "Login fails with SSO", "meta": {"plan": "pro"}, "priority": 2},
+  {"ticket_id": "T-2", "body": "Export is slow", "tags": ["export", "perf"]},
+  "not an object"
+]

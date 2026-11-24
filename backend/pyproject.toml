@@ -1,0 +1,126 @@
+[project]
+name = "copilot-backend"
+version = "0.1.0"
+description = "AI Product Manager Copilot - FastAPI modular monolith and background worker"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary - Infosys Springboard Virtual Internship 7.0, Batch 5, Project Z-5-1, Group 2" }
+authors = [{ name = "Group 2: Varshini, Lalitha, Monika, Pranay, Prasunabhika" }]
+
+# Runtime dependencies are pinned exactly. uv.lock pins every transitive package with
+# hashes for Windows, Linux and macOS. Update deliberately: move [tool.uv] exclude-newer,
+# edit a pin, run `uv lock`, then the full test suite.
+dependencies = [
+    "fastapi==0.162.2",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.14.3",
+    "pydantic-settings==2.16.2",
+    "sqlalchemy==2.1.8",
+    "psycopg[binary]==3.3.8",
+    "alembic==1.20.1",
+    "pgvector==0.5.1",
+    "httpx2==2.16.0",
+    "charset-normalizer==3.5.2",
+    "python-multipart==0.0.33",
+    "argon2-cffi==25.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.4",
+    "mypy==2.4.1",
+    "pytest==9.2.0",
+    "pytest-cov==7.1.0",
+]
+
+[project.scripts]
+copilot-worker = "copilot.workers.main:main"
+copilot-db-check = "copilot.db.check:main"
+copilot-ollama-check = "copilot.ai.check:main"
+
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/copilot"]
+
+[tool.uv]
+# Team members must use a uv new enough to read uv.lock.
+required-version = ">=0.9"
+# Supply-chain cooldown: resolve only releases published at least 14 days before the lock
+# was made (also for transitive packages). Move this date forward deliberately when updating.
+exclude-newer = "2026-11-10T00:00:00Z"
+# Everyone uses a uv-managed CPython 3.12 build, not whatever python.exe is on PATH.
+python-preference = "managed"
+
+# ---------------------------------------------------------------- Ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle, pyflakes
+    "I",             # isort
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "N",             # naming
+    "S",             # bandit security rules
+    "SIM", "C4", "RET", "PTH", "PL", "RUF",
+    "ASYNC", "DTZ", "T20", "ERA", "TID",
+]
+ignore = [
+    "PLR0913",  # FastAPI dependency signatures are legitimately wide
+    "PLR2004",  # magic values are fine in tests and protocol constants
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLR2004", "S608"]
+"migrations/**" = ["ERA001"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["copilot"]
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--tb=short"]
+markers = [
+    "db: needs a running PostgreSQL with pgvector (TEST_DATABASE_URL)",
+    "ollama: needs a running Ollama server with the configured models",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["copilot"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

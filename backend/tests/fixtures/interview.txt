@@ -1,0 +1,4 @@
+Interviewer: How do you use the export?
+Customer: Mostly weekly. It is slow
+when the file is big.
+Interviewer: Thanks.
