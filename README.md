@@ -1,8 +1,8 @@
-# Leonis AI
+# Elucis AI
 
-**L**earning from **E**vidence, **O**pinions & **N**eeds to **I**nform **S**trategy.
+**E**vidence-**L**ed **U**nified **C**ustomer **I**ntelligence **S**ystem. *Illuminate insights. Engineer better products.*
 
-Leonis AI turns customer feedback (reviews, support tickets, call transcripts and usage metrics) into evidence-backed product decisions, with a planning and requirements workspace. It runs local-first: the models run on your machine through Ollama, so customer data never leaves it.
+Elucis AI turns customer feedback (reviews, support tickets, call transcripts and usage metrics) into evidence-backed product decisions, with a planning and requirements workspace. It runs local-first: the models run on your machine through Ollama, so customer data never leaves it.
 
 Built as the *AI Product Manager Copilot* project (the name used in the SRS and design documents).
 

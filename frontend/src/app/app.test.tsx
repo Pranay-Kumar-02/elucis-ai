@@ -44,7 +44,7 @@ describe("application shell", () => {
     mockFetch({ "/api/v1/health": () => json(noDatabase, 503) });
     renderRoute("/");
     expect(
-      await screen.findByRole("heading", { name: "Welcome to Leonis AI" }),
+      await screen.findByRole("heading", { name: "Welcome to Elucis AI" }),
     ).toBeInTheDocument();
     const text = document.body.textContent;
     for (const internal of [

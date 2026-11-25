@@ -1,8 +1,8 @@
 {
-  "name": "leonis-frontend",
+  "name": "elucis-frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "Leonis AI - React web client",
+  "description": "Elucis AI - React web client",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {

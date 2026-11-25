@@ -1,3 +1,3 @@
-"""Leonis AI backend (modular monolith)."""
+"""Elucis AI backend (modular monolith)."""
 
 __version__ = "0.1.0"
