@@ -53,7 +53,7 @@ export function renderRoute(path: string) {
 
 export const healthyResponse = {
   status: "degraded",
-  service: "copilot-api",
+  service: "elucis-api",
   version: "0.1.0",
   checks: {
     database: { status: "ok", latency_ms: 2.1, detail: null },

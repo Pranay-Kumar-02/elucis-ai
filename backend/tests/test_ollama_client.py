@@ -10,8 +10,8 @@ import httpx2
 import pytest
 from pydantic import BaseModel
 
-from copilot.ai.ollama import InvalidModelOutputError, OllamaClient, cosine
-from copilot.core.errors import ModelUnavailableError
+from elucis.ai.ollama import InvalidModelOutputError, OllamaClient, cosine
+from elucis.core.errors import ModelUnavailableError
 from tests.conftest import make_settings
 
 Handler = Callable[[httpx2.Request], httpx2.Response]

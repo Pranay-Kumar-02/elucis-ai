@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, date, datetime
 
-from copilot.modules.ingestion.adapters.base import ColumnMapping, SourceType
-from copilot.modules.ingestion.adapters.file_adapter import FileAdapter
-from copilot.modules.ingestion.validation import (
+from elucis.modules.ingestion.adapters.base import ColumnMapping, SourceType
+from elucis.modules.ingestion.adapters.file_adapter import FileAdapter
+from elucis.modules.ingestion.validation import (
     MAX_TEXT_CHARS,
     MetricObservation,
     NormalizedRecord,

@@ -9,8 +9,8 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from copilot.core.errors import ConflictError
-from copilot.main import create_app
+from elucis.core.errors import ConflictError
+from elucis.main import create_app
 from tests.conftest import make_settings
 
 

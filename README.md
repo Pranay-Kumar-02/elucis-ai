@@ -54,7 +54,7 @@ Ollama runs as its own Windows app. Details, troubleshooting and manual commands
 
 ```text
 backend/                     FastAPI modular monolith + worker (Python 3.12, uv)
-  src/copilot/
+  src/elucis/
     main.py                  app factory: middleware, error handlers, routers
     core/                    settings, structured logging, error envelope, middleware
     api/                     versioned HTTP routers (/api/v1) and shared dependencies

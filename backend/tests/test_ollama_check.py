@@ -13,8 +13,8 @@ from typing import Any
 import httpx2
 import pytest
 
-from copilot.ai import check
-from copilot.ai.ollama import OllamaClient
+from elucis.ai import check
+from elucis.ai.ollama import OllamaClient
 
 DIM = 1024
 

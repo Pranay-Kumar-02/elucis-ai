@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
-from copilot.core.logging import (
+from elucis.core.logging import (
     ContextFilter,
     JsonFormatter,
     RedactionFilter,

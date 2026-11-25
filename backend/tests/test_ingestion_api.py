@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from copilot.main import create_app
+from elucis.main import create_app
 from tests.conftest import make_settings
 
 FIXTURES = Path(__file__).parent / "fixtures"

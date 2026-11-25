@@ -45,11 +45,11 @@ It runs these steps in order and stops at the first failure:
 Manual equivalents (inside `backend\` and `frontend\`):
 
 ```powershell
-uv run uvicorn copilot.main:create_app --factory --reload --port 8000
-uv run copilot-worker
+uv run uvicorn elucis.main:create_app --factory --reload --port 8000
+uv run elucis-worker
 uv run alembic upgrade head
-uv run copilot-db-check                 # report: .setup-reports\db-check.json
-uv run copilot-ollama-check             # report: .setup-reports\ollama-check.json
+uv run elucis-db-check                 # report: .setup-reports\db-check.json
+uv run elucis-ollama-check             # report: .setup-reports\ollama-check.json
 pnpm dev
 ```
 
@@ -68,7 +68,7 @@ How it works:
 - PostgreSQL listens on `localhost` inside WSL. WSL forwards `127.0.0.1:5432` to Windows, so the backend connects with an ordinary URL.
 - WSL stops a distribution shortly after its last Windows process exits. `dev-db.ps1 start` keeps one hidden `sleep infinity` process attached so the database stays up. No global WSL settings are changed.
 - Three roles follow D07 §5. `app_owner` owns the schema and runs migrations. `app_api` and `app_worker` can only read and write data, so row-level security will apply to them. Their passwords are in `.env`.
-- `copilot_test` is a separate database for automated tests. Tests never touch `copilot_dev`.
+- `elucis_test` is a separate database for automated tests. Tests never touch `elucis_dev`.
 
 ## 5. Configuration
 

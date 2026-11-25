@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from alembic import context
 
-from copilot.core.config import get_settings
-from copilot.db.base import Base
-from copilot.db.engine import build_engine
+from elucis.core.config import get_settings
+from elucis.db.base import Base
+from elucis.db.engine import build_engine
 
 config = context.config
 target_metadata = Base.metadata
@@ -34,7 +34,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = build_engine(_url(), get_settings(), application_name="copilot-alembic", pooled=False)
+    engine = build_engine(_url(), get_settings(), application_name="elucis-alembic", pooled=False)
     with engine.connect() as connection:
         context.configure(
             connection=connection,

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Phase A - read-only machine inventory for AI Product Manager Copilot.
+  Phase A - read-only machine inventory for Elucis AI.
 
 .DESCRIPTION
   Detects OS, hardware, GPU, and every tool the project needs, and writes

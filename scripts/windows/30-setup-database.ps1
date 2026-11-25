@@ -11,7 +11,7 @@
 
   Steps: install/configure (database\wsl\install-postgres.sh) -> keep WSL running in the
   background (dev-db.ps1 start) -> check Windows can reach 127.0.0.1:5432 -> alembic upgrade
-  head -> copilot-db-check (vector column, HNSW index, cosine query, full-text search).
+  head -> elucis-db-check (vector column, HNSW index, cosine query, full-text search).
   Passwords come from .env and are piped to WSL on stdin, never shown or put on a command line.
 
 .EXAMPLE
@@ -82,8 +82,8 @@ $current = Get-NativeOutput 'uv' @('run', '--frozen', '--directory', $backend, '
 $report.alembic_current = $current
 Write-Ok "Migration state: $current"
 
-Write-Step 'Verifying connection, pgvector and vector search (copilot-db-check)'
-$code = Invoke-Native 'uv' @('run', '--frozen', 'copilot-db-check', '--role', 'api') -WorkingDirectory $backend
+Write-Step 'Verifying connection, pgvector and vector search (elucis-db-check)'
+$code = Invoke-Native 'uv' @('run', '--frozen', 'elucis-db-check', '--role', 'api') -WorkingDirectory $backend
 $report.db_check_exit = $code
 Save-Report 'database-setup' $report
 if ($code -ne 0) { Write-Fail 'Database check failed. See .setup-reports\db-check.json'; exit 1 }

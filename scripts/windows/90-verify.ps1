@@ -58,7 +58,7 @@ Add-Result 'vite build (production)' (Invoke-Native 'pnpm' @('run', 'build') -Wo
 
 Write-Step 'Live API check'
 $apiLog = Join-Path $reports 'verify-api.log'
-$api = Start-Process -FilePath 'uv' -ArgumentList @('run', '--frozen', 'uvicorn', 'copilot.main:create_app', '--factory', '--port', '8765') `
+$api = Start-Process -FilePath 'uv' -ArgumentList @('run', '--frozen', 'uvicorn', 'elucis.main:create_app', '--factory', '--port', '8765') `
     -WorkingDirectory $backend -WindowStyle Hidden -PassThru -RedirectStandardOutput $apiLog -RedirectStandardError "$apiLog.err"
 try {
     $live = $null

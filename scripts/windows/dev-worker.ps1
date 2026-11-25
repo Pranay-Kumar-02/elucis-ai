@@ -8,4 +8,4 @@ Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
 Initialize-Session
 $backend = Join-Path (Get-ProjectRoot) 'backend'
 Write-Step 'Worker (Ctrl+C to stop after the current job)'
-exit (Invoke-Native 'uv' @('run', '--frozen', 'copilot-worker') -WorkingDirectory $backend)
+exit (Invoke-Native 'uv' @('run', '--frozen', 'elucis-worker') -WorkingDirectory $backend)

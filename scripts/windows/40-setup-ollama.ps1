@@ -7,7 +7,7 @@
   2. Pulls the two primary candidates if missing: qwen3:4b and qwen3-embedding:0.6b.
      qwen3:8b is NOT pulled (optional benchmark candidate only).
      -IncludeCandidates also pulls qwen3:4b-instruct for comparison (2.5 GB, see notes).
-  3. Runs copilot-ollama-check: connectivity, generation, schema-constrained JSON, embeddings
+  3. Runs elucis-ollama-check: connectivity, generation, schema-constrained JSON, embeddings
      with the measured dimension, semantic sanity, GPU offload.
   4. Restarts Ollama and runs the quick check again to prove the models are still available.
   Expected registry digests (ollama.com library, checked 24 Nov 2026):
@@ -68,13 +68,13 @@ foreach ($model in $wanted) {
 }
 
 Write-Step 'Smoke test (full)'
-$full = Invoke-Native 'uv' @('run', '--frozen', 'copilot-ollama-check') -WorkingDirectory $backend
+$full = Invoke-Native 'uv' @('run', '--frozen', 'elucis-ollama-check') -WorkingDirectory $backend
 $report.full_check_exit = $full
 
 if ($IncludeCandidates) {
     Write-Step 'Smoke test for comparison candidate qwen3:4b-instruct'
     $env:OLLAMA_CHAT_MODEL = 'qwen3:4b-instruct'
-    $cand = Invoke-Native 'uv' @('run', '--frozen', 'copilot-ollama-check', '--report',
+    $cand = Invoke-Native 'uv' @('run', '--frozen', 'elucis-ollama-check', '--report',
             (Join-Path $root '.setup-reports\ollama-check-qwen3-4b-instruct.json')) -WorkingDirectory $backend
     Remove-Item Env:OLLAMA_CHAT_MODEL
     $report.candidate_check_exit = $cand
@@ -90,7 +90,7 @@ if (-not $SkipRestartTest) {
     $report.restart_ok = [bool]$after
     if (-not $after) { Write-Fail 'Ollama did not come back within 60 s.'; Save-Report 'ollama-setup' $report; exit 1 }
     Write-Ok "Ollama back up ($after)."
-    $quick = Invoke-Native 'uv' @('run', '--frozen', 'copilot-ollama-check', '--quick') -WorkingDirectory $backend
+    $quick = Invoke-Native 'uv' @('run', '--frozen', 'elucis-ollama-check', '--quick') -WorkingDirectory $backend
     $report.after_restart_check_exit = $quick
 }
 

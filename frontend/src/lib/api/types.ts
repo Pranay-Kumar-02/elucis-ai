@@ -1,4 +1,4 @@
-/** Response types mirroring backend Pydantic schemas (copilot/schemas, modules/ingestion). */
+/** Response types mirroring backend Pydantic schemas (elucis/schemas, modules/ingestion). */
 
 export type CheckStatus = "ok" | "unavailable" | "not_configured";
 export type OverallStatus = "ok" | "degraded" | "unavailable";

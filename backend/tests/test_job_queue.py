@@ -14,9 +14,9 @@ import pytest
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.pool import NullPool
 
-from copilot.db.engine import normalise_url
-from copilot.workers.queue import JobQueue
-from copilot.workers.runtime import JobContext, Worker
+from elucis.db.engine import normalise_url
+from elucis.workers.queue import JobQueue
+from elucis.workers.runtime import JobContext, Worker
 
 pytestmark = pytest.mark.db
 

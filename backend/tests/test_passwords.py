@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from copilot.security.passwords import (
+from elucis.security.passwords import (
     check_password_policy,
     hash_password,
     needs_rehash,

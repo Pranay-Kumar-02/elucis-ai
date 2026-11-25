@@ -129,7 +129,7 @@ describe("system status page", () => {
           latency_ms: 2,
           server_version: "18.7",
           pgvector_version: "0.8.7",
-          database: "copilot_dev",
+          database: "elucis_dev",
           role: "app_api",
           detail: null,
         }),

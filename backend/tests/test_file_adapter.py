@@ -7,20 +7,20 @@ from pathlib import Path
 
 import pytest
 
-from copilot.core.errors import UnsupportedFormatError, ValidationFailedError
-from copilot.modules.ingestion.adapters.base import (
+from elucis.core.errors import UnsupportedFormatError, ValidationFailedError
+from elucis.modules.ingestion.adapters.base import (
     BATCH_SIZE,
     MAX_RECORDS_PER_IMPORT,
     ColumnMapping,
     RowDefect,
     SourceAdapter,
 )
-from copilot.modules.ingestion.adapters.file_adapter import (
+from elucis.modules.ingestion.adapters.file_adapter import (
     FileAdapter,
     parse_file,
     split_transcript,
 )
-from copilot.modules.ingestion.adapters.registry import get_adapter_class, list_sources
+from elucis.modules.ingestion.adapters.registry import get_adapter_class, list_sources
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

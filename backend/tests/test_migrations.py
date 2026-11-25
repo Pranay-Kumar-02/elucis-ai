@@ -8,8 +8,8 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-from copilot.core.config import BACKEND_ROOT, get_settings
-from copilot.db.engine import normalise_url
+from elucis.core.config import BACKEND_ROOT, get_settings
+from elucis.db.engine import normalise_url
 
 pytestmark = pytest.mark.db
 

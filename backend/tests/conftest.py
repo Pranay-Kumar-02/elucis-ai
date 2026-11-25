@@ -1,7 +1,7 @@
 """Shared fixtures.
 
 Unit tests need nothing external. Tests marked ``db`` use TEST_DATABASE_URL (role app_owner
-on the separate ``copilot_test`` database, never the dev database); each test session works
+on the separate ``elucis_test`` database, never the dev database); each test session works
 in its own throwaway schema, removed afterwards. Without TEST_DATABASE_URL they are reported
 as skipped with the reason, never silently passed.
 """
@@ -17,10 +17,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.pool import NullPool
 
-from copilot.core.config import REPO_ROOT, Settings
-from copilot.core.logging import redact_text
-from copilot.db.engine import dispose_engines, normalise_url
-from copilot.main import create_app
+from elucis.core.config import REPO_ROOT, Settings
+from elucis.core.logging import redact_text
+from elucis.db.engine import dispose_engines, normalise_url
+from elucis.main import create_app
 
 UNREACHABLE_OLLAMA = "http://127.0.0.1:9"  # discard port: connection refused immediately
 

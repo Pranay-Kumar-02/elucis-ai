@@ -13,7 +13,7 @@ Follow the SRS and design. Do not silently change a design decision or the stack
 
 ## Product standards (non-negotiable)
 
-- A premium, enterprise-grade product, not a student demo. Internship labels (programme name, group, batch, project code, "development build") never appear in the UI; a frontend test enforces it. The product name lives only in `frontend/src/config/product.ts` and `backend/src/copilot/core/config.py` (`app_name`).
+- A premium, enterprise-grade product, not a student demo. Internship labels (programme name, group, batch, project code, "development build") never appear in the UI; a frontend test enforces it. The product name lives only in `frontend/src/config/product.ts` and `backend/src/elucis/core/config.py` (`app_name`).
 - Real loading, empty and error states. No mock data presented as real, no fake success, no fabricated AI output.
 - Report feature status as: implemented and verified / partial / designed only / blocked. "Complete" means frontend + backend + database + validation + error handling + tests, all run.
 - Never claim something works without running it. Never claim PostgreSQL or Ollama is configured without checking.
@@ -45,7 +45,7 @@ Database tests need `TEST_DATABASE_URL`; without it they are skipped.
 
 ## Layout
 
-- `backend/src/copilot/`: `core/` (config, errors, logging, middleware), `db/`, `ai/` (Ollama gateway), `api/v1/`, `modules/ingestion/` (adapters, mapping, parsing, validation, service, router), `workers/`. Error envelope `{error: {code, message, details, request_id}}`; routes under `/api/v1`.
+- `backend/src/elucis/`: `core/` (config, errors, logging, middleware), `db/`, `ai/` (Ollama gateway), `api/v1/`, `modules/ingestion/` (adapters, mapping, parsing, validation, service, router), `workers/`. Error envelope `{error: {code, message, details, request_id}}`; routes under `/api/v1`.
 - `frontend/src/`: `app/` (routes, tests), `components/` (layout, brand, ui), `features/` (dashboard, sources, system), `lib/api/` (client, endpoints, types), `config/product.ts`.
 - `database/`: role and database bootstrap, WSL install script. `scripts/windows/`: setup and run scripts.
 
@@ -67,5 +67,4 @@ This laptop: PostgreSQL not set up yet (`30-setup-database.ps1`); Ollama 0.40.4 
 
 ## Housekeeping
 
-- Internal identifiers still say "copilot" (Python package, database names `copilot_*`, service id `copilot-api`). Renaming them to "elucis" is pending the owner's decision; do it before the database is created if approved.
 - "Elucis" is also the name of an FDA-cleared surgical-planning product and has a US trademark record (IMP-21). Fine for the internship; check before any commercial release.

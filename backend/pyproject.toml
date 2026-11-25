@@ -1,5 +1,5 @@
 [project]
-name = "copilot-backend"
+name = "elucis-backend"
 version = "0.1.0"
 description = "Elucis AI - FastAPI modular monolith and background worker"
 readme = "README.md"
@@ -35,16 +35,16 @@ dev = [
 ]
 
 [project.scripts]
-copilot-worker = "copilot.workers.main:main"
-copilot-db-check = "copilot.db.check:main"
-copilot-ollama-check = "copilot.ai.check:main"
+elucis-worker = "elucis.workers.main:main"
+elucis-db-check = "elucis.db.check:main"
+elucis-ollama-check = "elucis.ai.check:main"
 
 [build-system]
 requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/copilot"]
+packages = ["src/elucis"]
 
 [tool.uv]
 # Team members must use a uv new enough to read uv.lock.
@@ -93,7 +93,7 @@ docstring-code-format = true
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["copilot"]
+packages = ["elucis"]
 mypy_path = "src"
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
@@ -119,7 +119,7 @@ markers = [
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["copilot"]
+source = ["elucis"]
 branch = true
 
 [tool.coverage.report]

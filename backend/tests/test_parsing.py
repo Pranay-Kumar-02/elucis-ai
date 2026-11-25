@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from copilot.modules.ingestion.parsing import (
+from elucis.modules.ingestion.parsing import (
     DateOrder,
     infer_date_order,
     parse_iso_date,

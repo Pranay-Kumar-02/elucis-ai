@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from copilot.main import create_app
+from elucis.main import create_app
 from tests.conftest import make_settings
 
 

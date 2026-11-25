@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from copilot.core.errors import ValidationFailedError
-from copilot.modules.ingestion.adapters.base import ColumnMapping, SourceType
-from copilot.modules.ingestion.mapping import (
+from elucis.core.errors import ValidationFailedError
+from elucis.modules.ingestion.adapters.base import ColumnMapping, SourceType
+from elucis.modules.ingestion.mapping import (
     check_mapping,
     normalise_header,
     required_fields,

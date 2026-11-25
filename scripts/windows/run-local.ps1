@@ -82,19 +82,19 @@ Write-Ok 'frontend\node_modules matches pnpm-lock.yaml.'
 Write-Step 'Starting the backend (new window, port 8000)'
 # Dev endpoints on for this run; no .env and no database yet, so DB checks say "not configured".
 $apiCommand = @"
-`$host.UI.RawUI.WindowTitle = 'Copilot API :8000'
+`$host.UI.RawUI.WindowTitle = 'Elucis API :8000'
 Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 `$env:APP_ENV = 'development'
 `$env:ENABLE_DEV_ENDPOINTS = 'true'
 `$env:PYTHONUTF8 = '1'
-uv run --no-sync uvicorn copilot.main:create_app --factory --host 127.0.0.1 --port 8000
+uv run --no-sync uvicorn elucis.main:create_app --factory --host 127.0.0.1 --port 8000
 "@
 $api = Start-Window $apiCommand $backend
 $report.steps.backend_pid = $api.Id
 
 Write-Step 'Starting the frontend (new window, port 5173)'
 $webCommand = @"
-`$host.UI.RawUI.WindowTitle = 'Copilot Web :5173'
+`$host.UI.RawUI.WindowTitle = 'Elucis Web :5173'
 node ./node_modules/vite/bin/vite.js
 "@
 $web = Start-Window $webCommand $frontend
@@ -110,8 +110,8 @@ foreach ($i in 1..60) {
 }
 $report.steps.backend_listening = $apiUp
 $report.steps.frontend_listening = $webUp
-if ($apiUp) { Write-Ok 'Backend listening on 127.0.0.1:8000' } else { Write-Fail 'Backend did not start within 60 s - look at the "Copilot API :8000" window.' }
-if ($webUp) { Write-Ok 'Frontend listening on 127.0.0.1:5173' } else { Write-Fail 'Frontend did not start within 60 s - look at the "Copilot Web :5173" window.' }
+if ($apiUp) { Write-Ok 'Backend listening on 127.0.0.1:8000' } else { Write-Fail 'Backend did not start within 60 s - look at the "Elucis API :8000" window.' }
+if ($webUp) { Write-Ok 'Frontend listening on 127.0.0.1:5173' } else { Write-Fail 'Frontend did not start within 60 s - look at the "Elucis Web :5173" window.' }
 
 Write-Step 'Endpoint checks (direct to backend, and through the frontend proxy)'
 $targets = @(
@@ -158,4 +158,4 @@ if (-not $NoBrowser -and $webUp) {
 
 Write-Host ''
 Write-Ok 'App running. Backend docs: http://127.0.0.1:8000/api/v1/docs'
-Write-Info 'Stop it by closing the "Copilot API :8000" and "Copilot Web :5173" windows.'
+Write-Info 'Stop it by closing the "Elucis API :8000" and "Elucis Web :5173" windows.'

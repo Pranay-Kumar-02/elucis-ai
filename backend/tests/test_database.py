@@ -9,9 +9,9 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from copilot.db import check as db_check
-from copilot.db.engine import normalise_url, workspace_scope
-from copilot.repositories.system import SystemRepository, pgvector_ok
+from elucis.db import check as db_check
+from elucis.db.engine import normalise_url, workspace_scope
+from elucis.repositories.system import SystemRepository, pgvector_ok
 
 pytestmark = pytest.mark.db
 

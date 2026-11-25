@@ -52,10 +52,10 @@ def test_production_hides_diagnostics_by_default() -> None:
 
 
 def test_secrets_never_in_repr_and_dsn_redacted() -> None:
-    s = make_settings(database_url="postgresql://app_api:s3cret-pw@localhost:5432/copilot_dev")
+    s = make_settings(database_url="postgresql://app_api:s3cret-pw@localhost:5432/elucis_dev")
     assert "s3cret-pw" not in repr(s)
-    assert s.dsn_redacted() == "postgresql://app_api:***@localhost:5432/copilot_dev"
-    assert s.dsn() == "postgresql://app_api:s3cret-pw@localhost:5432/copilot_dev"
+    assert s.dsn_redacted() == "postgresql://app_api:***@localhost:5432/elucis_dev"
+    assert s.dsn() == "postgresql://app_api:s3cret-pw@localhost:5432/elucis_dev"
 
 
 def test_worker_and_migration_urls_fall_back_to_api_url() -> None:

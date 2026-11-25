@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Install PostgreSQL 18 + pgvector 0.8.7 from the official PostgreSQL apt repository
-# (PGDG) inside WSL2 Ubuntu, then create the Copilot roles and databases.
+# (PGDG) inside WSL2 Ubuntu, then create the Elucis roles and databases.
 #
 # Run by scripts/windows/30-setup-database.ps1 as:  wsl -d <distro> -u root -- bash <this>
 # Reads three passwords from stdin (owner, api, worker; one per line) so they never appear
@@ -16,7 +16,7 @@ PGVECTOR_WANTED="0.8.7"
 PG_PORT=5432
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOOTSTRAP_DIR="$SCRIPT_DIR/../bootstrap"
-COPILOT_REPORT="${1:-}"
+ELUCIS_REPORT="${1:-}"
 
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -24,13 +24,13 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || die "run as root (wsl -u root)"
 
 # ---- secrets from stdin, before anything else can consume stdin ----
-IFS= read -r COPILOT_OWNER_PASSWORD || die "owner password missing on stdin"
-IFS= read -r COPILOT_API_PASSWORD || die "api password missing on stdin"
-IFS= read -r COPILOT_WORKER_PASSWORD || die "worker password missing on stdin"
-COPILOT_OWNER_PASSWORD=${COPILOT_OWNER_PASSWORD%$'\r'}
-COPILOT_API_PASSWORD=${COPILOT_API_PASSWORD%$'\r'}
-COPILOT_WORKER_PASSWORD=${COPILOT_WORKER_PASSWORD%$'\r'}
-export COPILOT_OWNER_PASSWORD COPILOT_API_PASSWORD COPILOT_WORKER_PASSWORD
+IFS= read -r ELUCIS_OWNER_PASSWORD || die "owner password missing on stdin"
+IFS= read -r ELUCIS_API_PASSWORD || die "api password missing on stdin"
+IFS= read -r ELUCIS_WORKER_PASSWORD || die "worker password missing on stdin"
+ELUCIS_OWNER_PASSWORD=${ELUCIS_OWNER_PASSWORD%$'\r'}
+ELUCIS_API_PASSWORD=${ELUCIS_API_PASSWORD%$'\r'}
+ELUCIS_WORKER_PASSWORD=${ELUCIS_WORKER_PASSWORD%$'\r'}
+export ELUCIS_OWNER_PASSWORD ELUCIS_API_PASSWORD ELUCIS_WORKER_PASSWORD
 exec </dev/null
 
 export DEBIAN_FRONTEND=noninteractive
@@ -90,11 +90,11 @@ log "Applying database bootstrap (roles app_owner, app_api, app_worker)"
 
 # ---- 5. summary ----
 server_version=$(runuser -u postgres -- psql -X -At -p "${PG_PORT}" -c "SHOW server_version" postgres)
-vector_version=$(runuser -u postgres -- psql -X -At -p "${PG_PORT}" -d copilot_dev -c "SELECT extversion FROM pg_extension WHERE extname='vector'")
+vector_version=$(runuser -u postgres -- psql -X -At -p "${PG_PORT}" -d elucis_dev -c "SELECT extversion FROM pg_extension WHERE extname='vector'")
 systemd=$([[ "$(ps -p 1 -o comm=)" == "systemd" ]] && echo true || echo false)
 log "PostgreSQL ${server_version}, pgvector ${vector_version}, port ${PG_PORT}"
-if [[ -n "${COPILOT_REPORT:-}" ]]; then
-  cat >"$COPILOT_REPORT" <<JSON
+if [[ -n "${ELUCIS_REPORT:-}" ]]; then
+  cat >"$ELUCIS_REPORT" <<JSON
 {"distribution": "${PRETTY_NAME}", "codename": "${VERSION_CODENAME}",
  "postgresql_package": "${pg_candidate}", "pgvector_package": "${vec_candidate}",
  "server_version": "${server_version}", "pgvector_version": "${vector_version}",
