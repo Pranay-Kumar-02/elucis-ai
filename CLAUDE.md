@@ -22,7 +22,7 @@ Follow the SRS and design. Do not silently change a design decision or the stack
 ## Safety rules
 
 - Never print, commit or expose secrets, `.env`, credentials, `.setup-reports/`, `data/` or database files. Never hardcode credentials.
-- Do not create a GitHub repository, add a remote or push until the owner says so.
+- The repository is published at `origin` (GitHub, branch `main`). Commit and push only when the owner asks. Never force-push, rewrite or delete existing commits, or run destructive resets; on a remote conflict or security issue, stop and report.
 - Do not delete the owner's files. Do not run destructive database commands.
 - Ask before installing system-level software. Do not assume Docker exists.
 - Keep approved package versions. Dependency cooldown: releases at least 14 days old (`exclude-newer` in uv, `minimumReleaseAge` in pnpm).
@@ -67,6 +67,5 @@ This laptop: PostgreSQL not set up yet (`30-setup-database.ps1`); Ollama 0.40.4 
 
 ## Housekeeping
 
-- Obsolete files, safe for the owner to delete: `frontend/src/features/sources/FilePreviewPage.tsx` and `SourceCatalogue.tsx`. They import a removed hook, so `pnpm verify` fails until they are gone.
 - Internal identifiers still say "copilot" (Python package, database names `copilot_*`, service id `copilot-api`). Renaming them to "elucis" is pending the owner's decision; do it before the database is created if approved.
 - "Elucis" is also the name of an FDA-cleared surgical-planning product and has a US trademark record (IMP-21). Fine for the internship; check before any commercial release.

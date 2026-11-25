@@ -99,6 +99,6 @@ docs/
 ## Security rules
 
 - Secrets live only in `.env` (git-ignored, created by the setup script, readable only by your account). `.env.example` lists the names.
-- Never commit `.env`, `.setup-reports/`, `data/` or database files. The repository has no remote yet; GitHub will be connected later.
+- Never commit `.env`, `.setup-reports/`, `data/` or database files. The history was scanned for secrets before it was published.
 - Customer text is never logged. Logs mask connection-string passwords and secret-looking fields.
 - Development endpoints (`/api/v1/dev/*`) exist only when `ENABLE_DEV_ENDPOINTS=true`, and the app refuses to start in production with them enabled.
