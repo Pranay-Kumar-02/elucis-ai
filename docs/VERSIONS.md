@@ -2,7 +2,7 @@
 
 Two kinds of version are recorded here: **pinned** versions, fixed in the lockfiles, and **measured** versions, read from a real machine by the setup scripts. The scripts write the full machine record to `.setup-reports\versions.json`, `postgres-wsl.json` and `ollama-check.json`.
 
-Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every transitive package with hashes (`backend/uv.lock`: 54 packages for Windows, Linux and macOS; `frontend/pnpm-lock.yaml`). Only releases published at least 14 days before the lock date (10 Nov 2026) are allowed (IMP-06).
+Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every transitive package with hashes (`backend/uv.lock`: 55 packages for Windows, Linux and macOS; `frontend/pnpm-lock.yaml`). Only releases published at least 14 days before the lock date (10 Nov 2026) are allowed (IMP-06).
 
 ## Platform baseline
 
@@ -33,6 +33,7 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 | charset-normalizer | 3.5.2 | File encoding detection |
 | python-multipart | 0.0.33 | File uploads |
 | argon2-cffi | 25.1.0 | Argon2id password hashing |
+| python-dateutil | 4.0.0 | Reading written dates in feedback files (D06 step 7) |
 | *dev:* ruff | 0.17.4 | Formatter and linter |
 | *dev:* mypy | 2.4.1 | Static type checking (strict) |
 | *dev:* pytest | 9.2.0 | Tests |
@@ -58,5 +59,5 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 
 | Environment | What was verified | Result |
 |---|---|---|
-| Build environment (Linux, Python 3.12.3, Node 22.23.5, PostgreSQL 18.7 + pgvector 0.8.7 built from the official source tags) | Backend lint, type check, 104 tests including real-database and job-queue tests; frontend type check, lint, format, 20 tests, production build; API and web app run together | All passed (24 Nov 2026) |
+| Build environment (Linux, Python 3.12.3, Node 22.23.5, PostgreSQL 18.7 + pgvector 0.8.7 built from the official source tags) | Backend lint, type check, 195 tests including real-database and job-queue tests; frontend type check, lint, format, 25 tests, production build; API and web app run together | All passed (24 Nov 2026) |
 | Team laptop (Windows 11 26H2, i7-13700HX, RTX 4060 8 GB, 13.7 GB RAM) | Setup scripts 10–90 | Recorded in `.setup-reports\` when the scripts run |

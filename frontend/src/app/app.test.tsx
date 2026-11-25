@@ -155,6 +155,7 @@ describe("system status page", () => {
 
 describe("imports page", () => {
   const preview = {
+    input: "file",
     original_filename: "reviews.csv",
     size_bytes: 150,
     sha256: "ab".repeat(32),
@@ -162,25 +163,75 @@ describe("imports page", () => {
     detected_encoding: "utf-8",
     csv_delimiter: ",",
     transcript_mode: null,
-    columns: ["id", "review"],
+    record_count: 2,
+    columns: ["id", "review", "user"],
     preview_rows: [
-      ["1", "App crashes"],
-      ["2", ""],
+      ["1", "App crashes", "u-1"],
+      ["2", "", "u-2"],
     ],
     total_rows: 2,
-    warnings: ["1 row(s) have a different number of values than the header."],
+    warnings: ["1 row(s) have fewer values than the header; missing values are empty."],
+    source_type: "review",
+    required_fields: ["text"],
+    suggested_mapping: { text: "review", source_record_id: "id" },
+  };
+  const report = {
+    file: { ...preview },
+    source_type: "review",
+    column_mapping: { text: "review", source_record_id: "id", customer_id: "user" },
+    date_order: null,
+    summary: {
+      received: 2,
+      valid: 1,
+      rejected: 1,
+      rejected_by_code: { text_missing: 1 },
+      flags_by_code: { occurred_at_missing: 1 },
+      reconciled: true,
+    },
+    errors: [
+      {
+        row_number: 2,
+        segment_index: 0,
+        field: "text",
+        code: "text_missing",
+        message: "Text is empty.",
+      },
+    ],
+    errors_truncated: false,
+    sample_records: [
+      {
+        row_number: 1,
+        segment_index: 0,
+        source_type: "review",
+        raw_text: "App crashes",
+        text_truncated: false,
+        source_record_id: "1",
+        occurred_at: null,
+        occurred_at_raw: null,
+        occurred_at_missing: true,
+        customer_ref: "u-1",
+        rating_raw: null,
+        rating_value: null,
+        rating_out_of: null,
+        product_version_raw: null,
+        speaker: null,
+        metadata: {},
+        flags: ["occurred_at_missing"],
+      },
+    ],
+    sample_metrics: [],
+    warnings: [],
   };
 
-  it("checks a file through the backend and shows the detected preview", async () => {
+  it("previews a file, suggests column matches and validates every row", async () => {
     const fetchMock = mockFetch({
       "/api/v1/health": () => json(noDatabase, 503),
       "/api/v1/dev/sources/adapters": () => json(adapters),
       "/api/v1/dev/sources/preview": () => json(preview),
+      "/api/v1/dev/sources/validate": () => json(report),
     });
     renderRoute("/imports");
     expect(await screen.findByText("Zendesk tickets")).toBeInTheDocument();
-    expect(screen.getByText("Available")).toBeInTheDocument();
-    expect(screen.getByText("Planned")).toBeInTheDocument();
     expect(
       await screen.findByText("Importing starts once the database is connected"),
     ).toBeInTheDocument();
@@ -189,16 +240,79 @@ describe("imports page", () => {
       screen.getByLabelText(/choose a file/i),
       new File(["id,review\n1,App crashes\n"], "reviews.csv", { type: "text/csv" }),
     );
-    expect(await screen.findByText("App crashes")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "review" })).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "review" })).toBeInTheDocument();
     expect(screen.getByText("Comma")).toBeInTheDocument();
-    expect(screen.getByText("empty")).toBeInTheDocument();
-    expect(screen.getByText(/different number of values/)).toBeInTheDocument();
+    expect(screen.getByText(/fewer values than the header/)).toBeInTheDocument();
+
+    // Suggested matches are pre-filled but editable; no customer column -> identity warning.
+    expect(screen.getByLabelText(/Feedback text/)).toHaveValue("review");
+    expect(screen.getByLabelText(/Record ID/)).toHaveValue("id");
+    expect(screen.getByText(/customer identity will be unknown/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText(/Customer ID/), "user");
+    expect(screen.queryByText(/customer identity will be unknown/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Check records" }));
+    expect(await screen.findByText("Records checked")).toBeInTheDocument();
+    expect(screen.getByText("Ready to import")).toBeInTheDocument();
+    expect(screen.getByText("Empty feedback text")).toBeInTheDocument();
+    expect(screen.getByText("Text is empty.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start import" })).toBeDisabled();
+
+    const call = fetchMock.mock.calls.find(([u]) =>
+      requestPath(u).endsWith("/dev/sources/validate"),
+    );
+    const body = call?.[1]?.body as FormData;
+    expect(body.get("source_type")).toBe("review");
+    expect(JSON.parse(body.get("mapping") as string)).toEqual({
+      text: "review",
+      source_record_id: "id",
+      customer_id: "user",
+    });
+  });
+
+  it("blocks checking until required fields are matched", async () => {
+    mockFetch({
+      "/api/v1/health": () => json(healthyResponse),
+      "/api/v1/dev/sources/adapters": () => json(adapters),
+      "/api/v1/dev/sources/preview": () => json({ ...preview, suggested_mapping: {} }),
+    });
+    renderRoute("/imports");
+    await userEvent.upload(screen.getByLabelText(/choose a file/i), new File(["x"], "r.csv"));
+    expect(
+      await screen.findByText(/Choose a column for Feedback text to continue/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check records" })).toBeDisabled();
+  });
+
+  it("previews pasted text", async () => {
+    const fetchMock = mockFetch({
+      "/api/v1/health": () => json(healthyResponse),
+      "/api/v1/dev/sources/adapters": () => json(adapters),
+      "/api/v1/dev/sources/preview": () =>
+        json({
+          ...preview,
+          input: "pasted_text",
+          original_filename: "pasted-text.txt",
+          detected_format: "txt",
+          csv_delimiter: null,
+          transcript_mode: "paragraphs",
+          columns: ["segment_index", "text"],
+          preview_rows: [["0", "Export is slow"]],
+          total_rows: 1,
+          warnings: [],
+          suggested_mapping: { text: "text" },
+        }),
+    });
+    renderRoute("/imports");
+    await userEvent.click(screen.getByRole("radio", { name: "Paste text" }));
+    await userEvent.type(screen.getByLabelText("Pasted feedback"), "Export is slow");
+    await userEvent.click(screen.getByRole("button", { name: "Preview text" }));
+    expect(await screen.findByText("Pasted text")).toBeInTheDocument();
+    expect(screen.getByText(/Text is split automatically/)).toBeInTheDocument();
     const call = fetchMock.mock.calls.find(([u]) =>
       requestPath(u).endsWith("/dev/sources/preview"),
     );
-    expect(call?.[1]?.method).toBe("POST");
-    expect(call?.[1]?.body).toBeInstanceOf(FormData);
+    expect((call?.[1]?.body as FormData).get("pasted_text")).toBe("Export is slow");
   });
 
   it("shows the server's reason and a reference when a file is rejected", async () => {

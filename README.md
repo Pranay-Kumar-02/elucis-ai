@@ -57,7 +57,7 @@ backend/                     FastAPI modular monolith + worker (Python 3.12, uv)
     db/                      engines and sessions per role, declarative base, setup verifier
     repositories/            all SQL lives here
     services/                platform services (health)
-    modules/ingestion/       Module 2: source adapters (file adapter), preview endpoints
+    modules/ingestion/       Module 2: file adapter, mapping, row validation; dev preview/validate/fetch endpoints
     ai/                      model gateway: Ollama client + smoke-test CLI
     security/                Argon2id password hashing
     workers/                 PostgreSQL job queue and worker runtime
@@ -67,7 +67,7 @@ backend/                     FastAPI modular monolith + worker (Python 3.12, uv)
 frontend/                    React app (pnpm)
   src/app/                   providers, routes, router
   src/components/            layout shell and shadcn/ui components
-  src/features/              dashboard, system status, file preview
+  src/features/              dashboard, system status, imports (sources)
   src/lib/                   typed API client, env handling, utilities
 database/
   bootstrap/                 roles (app_owner, app_api, app_worker), databases, pgvector, grants

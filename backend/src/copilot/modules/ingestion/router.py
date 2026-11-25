@@ -1,35 +1,50 @@
-"""Development-only ingestion endpoints.
+"""Development-only source endpoints: check, validate and fetch feedback files.
 
-Mounted only when ``ENABLE_DEV_ENDPOINTS=true`` and never in production (settings validator).
-They exercise the real file adapter without authentication or storage, so the team and the
-mentor can try data fetching before the auth and schema tasks. The production equivalents
-are API-14 (``POST /workspaces/{ws}/files``) and API-15 (imports), which require a session,
-a workspace role and the database. Nothing is written to disk by these endpoints.
+Mounted only when ``ENABLE_DEV_ENDPOINTS=true`` and never in production (settings
+validator). They run the real source-fetching layer (file adapter, mapping rules, row
+validation) without authentication or storage, so files can be checked before workspaces
+and the database exist. Nothing is written to disk.
+
+Production equivalents (need a session, a workspace role and the database):
+``POST /workspaces/{ws}/files`` (API-14) and ``POST /workspaces/{ws}/imports`` (API-15).
+
+Every endpoint takes multipart form data with exactly one of ``file`` or ``pasted_text``.
 """
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
-from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from copilot.api.deps import SettingsDep
-from copilot.core.errors import ValidationFailedError
-from copilot.modules.ingestion.adapters.base import ColumnMapping
-from copilot.modules.ingestion.schemas import FilePreviewOut, MappedPreviewOut, SourceInfoOut
+from copilot.modules.ingestion.adapters.base import SourceType
+from copilot.modules.ingestion.schemas import (
+    FetchPageOut,
+    FilePreviewOut,
+    SourceInfoOut,
+    ValidationReportOut,
+)
 from copilot.modules.ingestion.service import (
-    preview_file,
-    preview_mapping,
-    read_upload,
+    fetch_source,
+    parse_mapping,
+    preview_source,
+    read_source_input,
     source_catalogue,
+    validate_source,
 )
 
 UPLOAD_PATH_PREFIX = "/api/v1/dev/sources/"
 
 router = APIRouter(prefix="/dev/sources", tags=["dev: data sources"])
+
+FileField = Annotated[UploadFile | None, File(description="CSV, JSON (array of records) or TXT")]
+PastedField = Annotated[str | None, Form(description="Pasted feedback text (FR-ING-10)")]
+MappingField = Annotated[
+    str | None,
+    Form(description='Column mapping as JSON, e.g. {"text": "review", "rating": "stars"}'),
+]
 
 
 @router.get("/adapters", response_model=list[SourceInfoOut], summary="Source adapter catalogue")
@@ -38,40 +53,48 @@ def adapters() -> list[SourceInfoOut]:
     return source_catalogue()
 
 
-@router.post("/preview", response_model=FilePreviewOut, summary="Detect and preview a file")
+@router.post("/preview", response_model=FilePreviewOut, summary="Detect and preview a source")
 async def preview(
     settings: SettingsDep,
-    file: Annotated[UploadFile, File(description="CSV, JSON (array of objects) or TXT")],
+    file: FileField = None,
+    pasted_text: PastedField = None,
+    source_type: Annotated[SourceType, Form()] = SourceType.REVIEW,
     rows: Annotated[int | None, Query(ge=1, le=200)] = None,
 ) -> FilePreviewOut:
-    data, sha256 = await read_upload(file, settings.upload_max_bytes)
+    """Format, encoding, columns, the first rows and a suggested column mapping."""
+    src = await read_source_input(file, pasted_text, settings.upload_max_bytes)
     # Parsing is CPU-bound; keep it off the event loop.
-    return await run_in_threadpool(
-        preview_file, data, sha256, file.filename or "upload", rows or settings.preview_rows
-    )
+    return await run_in_threadpool(preview_source, src, source_type, rows or settings.preview_rows)
 
 
-@router.post("/map", response_model=MappedPreviewOut, summary="Apply a column mapping")
-async def map_columns(
+@router.post("/validate", response_model=ValidationReportOut, summary="Validate every row")
+async def validate(
     settings: SettingsDep,
-    file: Annotated[UploadFile, File()],
-    mapping: Annotated[str | None, Form(description='JSON, e.g. {"text": "review"}')] = None,
-    rows: Annotated[int | None, Query(ge=1, le=200)] = None,
-) -> MappedPreviewOut:
-    column_mapping: ColumnMapping | None = None
-    if mapping:
-        try:
-            column_mapping = ColumnMapping.model_validate(json.loads(mapping))
-        except (json.JSONDecodeError, ValidationError) as exc:
-            raise ValidationFailedError(
-                "mapping must be a JSON object with at least a text column.",
-                details=[{"field": "mapping", "issue": "invalid"}],
-            ) from exc
-    data, _ = await read_upload(file, settings.upload_max_bytes)
-    return await run_in_threadpool(
-        preview_mapping,
-        data,
-        file.filename or "upload",
-        column_mapping,
-        rows or settings.preview_rows,
-    )
+    source_type: Annotated[SourceType, Form()],
+    file: FileField = None,
+    pasted_text: PastedField = None,
+    mapping: MappingField = None,
+) -> ValidationReportOut:
+    """Apply the mapping and the SVC-04 rules to every row: counts, row errors with reasons
+    (DR-09) and a normalised sample. Text files may omit the mapping."""
+    column_mapping = parse_mapping(mapping)
+    src = await read_source_input(file, pasted_text, settings.upload_max_bytes)
+    return await run_in_threadpool(validate_source, src, source_type, column_mapping)
+
+
+@router.post("/fetch", response_model=FetchPageOut, summary="Fetch normalised records")
+async def fetch(
+    *,
+    settings: SettingsDep,
+    source_type: Annotated[SourceType, Form()],
+    file: FileField = None,
+    pasted_text: PastedField = None,
+    mapping: MappingField = None,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> FetchPageOut:
+    """One page of normalised records and rejected rows; pass ``next_cursor`` (with the same
+    file) for the next page (D09 cursor pagination)."""
+    column_mapping = parse_mapping(mapping)
+    src = await read_source_input(file, pasted_text, settings.upload_max_bytes)
+    return await run_in_threadpool(fetch_source, src, source_type, column_mapping, cursor, limit)

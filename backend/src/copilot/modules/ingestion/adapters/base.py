@@ -20,6 +20,18 @@ from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, Field
 
 BATCH_SIZE = 500  # D03 SVC-03: ingest in batches of 500 rows
+MAX_RECORDS_PER_IMPORT = 20_000  # A-05
+
+
+class SourceType(StrEnum):
+    """Import label (FR-ING-02; D07 ``import_jobs.source_type``)."""
+
+    REVIEW = "review"
+    TICKET = "ticket"
+    FEATURE_REQUEST = "feature_request"
+    TRANSCRIPT = "transcript"
+    OTHER = "other"
+    METRICS = "metrics"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +47,13 @@ class RawItem:
     rating_raw: str | None = None
     version_raw: str | None = None
     speaker: str | None = None
+    # Metric files only (DR-41; D09 ImportIn.column_mapping metric fields).
+    metric_name_raw: str | None = None
+    metric_value_raw: str | None = None
+    dimension_raw: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
+    # Structural problem found while reading (for example extra CSV values), if any.
+    defect: RowDefect | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -48,25 +66,44 @@ class RawItem:
             "rating_raw": self.rating_raw,
             "version_raw": self.version_raw,
             "speaker": self.speaker,
+            "metric_name_raw": self.metric_name_raw,
+            "metric_value_raw": self.metric_value_raw,
+            "dimension_raw": self.dimension_raw,
             "metadata": self.metadata,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class RowDefect:
+    """A record the reader could not represent faithfully; validation rejects it."""
+
+    code: str  # "extra_values" | "not_an_object"
+    message: str
 
 
 RawRow = RawItem
 
 
 class ColumnMapping(BaseModel):
-    """Column -> standard field mapping (FR-ING-03; D09 ``ImportIn.column_mapping``)."""
+    """Column -> standard field mapping (FR-ING-03; D09 ``ImportIn.column_mapping``).
+
+    Which fields are required depends on the source type and is checked against the file
+    by ``mapping.check_mapping``: feedback needs ``text``; metrics need ``metric_name``,
+    ``metric_value`` and ``occurred_at`` (DR-41).
+    """
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    text: str = Field(min_length=1)
+    text: str | None = Field(default=None, min_length=1)
     occurred_at: str | None = None
     customer_id: str | None = None
     rating: str | None = None
     product_version: str | None = None
     source_record_id: str | None = None
     speaker: str | None = None
+    metric_name: str | None = None
+    metric_value: str | None = None
+    dimension: str | None = None
 
     def mapped_columns(self) -> dict[str, str]:
         return {k: v for k, v in self.model_dump().items() if v}
