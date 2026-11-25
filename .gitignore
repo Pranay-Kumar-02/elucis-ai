@@ -14,6 +14,13 @@ data/
 *.dump
 *.sql.gz
 pgdata/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+tmp/
+*.bundle
 
 # ---- Python ----
 .venv/
