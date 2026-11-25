@@ -1,8 +1,8 @@
 {
-  "name": "copilot-frontend",
+  "name": "leonis-frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "AI Product Manager Copilot - React web client",
+  "description": "Leonis AI - React web client",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {

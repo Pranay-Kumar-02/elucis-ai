@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # ---- application ----
     app_env: Environment = Environment.DEVELOPMENT
-    app_name: str = "AI Product Manager Copilot"
+    app_name: str = "Leonis AI"
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.CONSOLE
 

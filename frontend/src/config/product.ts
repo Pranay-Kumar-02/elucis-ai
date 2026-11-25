@@ -3,7 +3,8 @@
  * Internal programme details (team, batch, project code) never belong in the product UI.
  */
 export const product = {
-  name: "PM Copilot",
-  fullName: "AI Product Manager Copilot",
+  name: "Leonis AI",
+  /** What the name stands for. */
+  expansion: "Learning from Evidence, Opinions & Needs to Inform Strategy",
   description: "Turn customer feedback into evidence-backed product decisions.",
 } as const;

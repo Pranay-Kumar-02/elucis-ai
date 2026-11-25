@@ -1,6 +1,10 @@
-# AI Product Manager Copilot
+# Leonis AI
 
-AI-driven product assistant based on customer feedback, with a planning and requirements generation workspace.
+**L**earning from **E**vidence, **O**pinions & **N**eeds to **I**nform **S**trategy.
+
+Leonis AI turns customer feedback (reviews, support tickets, call transcripts and usage metrics) into evidence-backed product decisions, with a planning and requirements workspace. It runs local-first: the models run on your machine through Ollama, so customer data never leaves it.
+
+Built as the *AI Product Manager Copilot* project (the name used in the SRS and design documents).
 
 Infosys Springboard Virtual Internship 7.0 · Batch 5 · Project #Z-5-1 · Group 2 (Varshini, Lalitha, Monika, Pranay, Prasunabhika)
 

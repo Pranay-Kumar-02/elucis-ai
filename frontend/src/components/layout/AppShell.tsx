@@ -5,6 +5,7 @@ import { NavLink, Outlet, useLocation, useMatches } from "react-router";
 import { Logo } from "@/components/brand/Logo";
 import { footerNav, mainNav, UNAVAILABLE_HINT, type NavItem } from "@/components/layout/nav";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { product } from "@/config/product";
 import { Button } from "@/components/ui/button";
 import { AiRuntimeBanner } from "@/features/system/AiRuntimeBanner";
 import { StatusIndicator } from "@/features/system/StatusIndicator";
@@ -96,7 +97,7 @@ export function AppShell() {
       .find(Boolean) ?? "";
 
   useEffect(() => {
-    document.title = title ? `${title} · PM Copilot` : "PM Copilot";
+    document.title = title ? `${title} · ${product.name}` : product.name;
   }, [title]);
 
   return (

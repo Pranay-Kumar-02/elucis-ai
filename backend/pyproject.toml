@@ -1,7 +1,7 @@
 [project]
 name = "copilot-backend"
 version = "0.1.0"
-description = "AI Product Manager Copilot - FastAPI modular monolith and background worker"
+description = "Leonis AI - FastAPI modular monolith and background worker"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "Proprietary - Infosys Springboard Virtual Internship 7.0, Batch 5, Project Z-5-1, Group 2" }
