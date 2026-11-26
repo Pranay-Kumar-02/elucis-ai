@@ -26,21 +26,48 @@ $report = [ordered]@{ generated_at = (Get-Date).ToString('o'); steps = [ordered]
 # ------------------------------------------------------------------ .env
 Write-Step 'Environment file (.env)'
 $envPath = Join-Path $root '.env'
+$examplePath = Join-Path $root '.env.example'
+
+function Resolve-EnvValue([string]$Key, [string]$Value, [hashtable]$Passwords) {
+    # Fills CHANGE_ME: database URLs get the password of their role, other secrets a new value.
+    switch -Regex ($Key) {
+        '^(DATABASE_URL|TEST_DATABASE_API_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.api) }
+        '^(DATABASE_WORKER_URL|TEST_DATABASE_WORKER_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.worker) }
+        '^(DATABASE_MIGRATION_URL|TEST_DATABASE_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.owner) }
+        default { if ($Value -eq 'CHANGE_ME') { return New-Secret 48 } }
+    }
+    return $Value
+}
+
 if (Test-Path $envPath) {
-    Write-Ok '.env already exists; left unchanged.'
-    $report.steps.env = 'kept existing'
+    # Add keys that newer versions of .env.example introduced, reusing the role passwords
+    # already in .env so the database roles keep working. Existing lines are never changed.
+    $current = Read-DotEnv $envPath
+    $passwords = @{
+        owner = Get-UrlPassword $current['DATABASE_MIGRATION_URL']
+        api = Get-UrlPassword $current['DATABASE_URL']
+        worker = Get-UrlPassword $current['DATABASE_WORKER_URL']
+    }
+    $added = @()
+    foreach ($line in [System.IO.File]::ReadAllLines($examplePath)) {
+        if ($line -match '^\s*#' -or $line -notmatch '=') { continue }
+        $key, $value = $line -split '=', 2
+        $key = $key.Trim()
+        if ($current.ContainsKey($key)) { continue }
+        $value = Resolve-EnvValue $key (($value -replace '\s+#.*$', '').Trim()) $passwords
+        if ($value -match 'CHANGE_ME') { Write-Warn "$key needs a value in .env (no matching password found)."; continue }
+        [System.IO.File]::AppendAllText($envPath, "$key=$value`n", (New-Object System.Text.UTF8Encoding($false)))
+        $added += $key
+    }
+    if ($added) { Write-Ok ".env already exists; added new keys (values not shown): $($added -join ', ')" }
+    else { Write-Ok '.env already exists; left unchanged.' }
+    $report.steps.env = if ($added) { "kept existing, added $($added.Count) keys" } else { 'kept existing' }
 } else {
-    $owner = New-Secret 24; $api = New-Secret 24; $worker = New-Secret 24
-    $lines = foreach ($line in [System.IO.File]::ReadAllLines((Join-Path $root '.env.example'))) {
+    $passwords = @{ owner = New-Secret 24; api = New-Secret 24; worker = New-Secret 24 }
+    $lines = foreach ($line in [System.IO.File]::ReadAllLines($examplePath)) {
         if ($line -match '^\s*#' -or $line -notmatch '=') { $line; continue }
         $key, $value = $line -split '=', 2
-        $value = ($value -replace '\s+#.*$', '').Trim()
-        switch -Regex ($key) {
-            '^DATABASE_URL$' { $value = $value.Replace('CHANGE_ME', $api) }
-            '^DATABASE_WORKER_URL$' { $value = $value.Replace('CHANGE_ME', $worker) }
-            '^(DATABASE_MIGRATION_URL|TEST_DATABASE_URL)$' { $value = $value.Replace('CHANGE_ME', $owner) }
-            default { if ($value -eq 'CHANGE_ME') { $value = New-Secret 48 } }
-        }
+        $value = Resolve-EnvValue $key (($value -replace '\s+#.*$', '').Trim()) $passwords
         "$key=$value"
     }
     Write-Utf8NoBom $envPath (($lines -join "`n") + "`n")

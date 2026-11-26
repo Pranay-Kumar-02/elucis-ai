@@ -1,8 +1,8 @@
 """Declarative base for ORM models.
 
 The constraint naming convention gives every index and constraint a predictable name, so
-Alembic autogenerate produces stable, reviewable migrations. The 54 tables from D07/D08 are
-added in the schema task; this module deliberately defines no tables yet.
+migrations and models agree on them. The 54 D07/D08 tables are in ``elucis.db.models``
+(migration 0002); most models pass explicit names that follow the same pattern.
 """
 
 from __future__ import annotations

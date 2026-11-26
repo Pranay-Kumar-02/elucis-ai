@@ -1,7 +1,8 @@
-"""Job queue claim semantics against real PostgreSQL (marker ``db``).
+"""Job queue claim semantics on the real ``jobs`` table (migration 0002, marker ``db``).
 
-The ``jobs`` table here is a test fixture in a throwaway schema with exactly the D07 columns
-the queue uses. It is not the production schema, which the schema task creates.
+Everything runs as ``app_worker`` under row-level security: jobs are enqueued inside their
+workspace, while claims, heartbeats and finishes work across workspaces through the
+worker's queue policy (D07 §5).
 """
 
 from __future__ import annotations
@@ -17,60 +18,38 @@ from sqlalchemy.pool import NullPool
 from elucis.db.engine import normalise_url
 from elucis.workers.queue import JobQueue
 from elucis.workers.runtime import JobContext, Worker
+from tests.schema_seed import bind, new_user, new_workspace
 
 pytestmark = pytest.mark.db
 
-JOBS_FIXTURE = """
-CREATE TABLE jobs (
-    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id  uuid NOT NULL,
-    created_at    timestamptz NOT NULL DEFAULT now(),
-    job_type      text NOT NULL,
-    status        text NOT NULL DEFAULT 'queued'
-                  CHECK (status IN ('queued','running','retry_wait','succeeded',
-                                    'succeeded_with_errors','failed','cancelled')),
-    priority      smallint NOT NULL DEFAULT 5,
-    payload       jsonb NOT NULL,
-    cursor        jsonb NOT NULL DEFAULT '{}',
-    progress      jsonb NOT NULL DEFAULT '{}',
-    attempts      smallint NOT NULL DEFAULT 0,
-    max_attempts  smallint NOT NULL DEFAULT 3,
-    run_after     timestamptz NOT NULL DEFAULT now(),
-    locked_by     text,
-    heartbeat_at  timestamptz,
-    started_at    timestamptz,
-    finished_at   timestamptz,
-    error         text,
-    idempotency_key text,
-    created_by    uuid
-)
-"""
+_workspace: dict[str, uuid.UUID] = {}
 
 
 @pytest.fixture
-def jobs_engine(schema_engine: Engine, test_schema: str) -> Iterator[Engine]:
-    # Always schema-qualified: these statements can only ever touch the throwaway schema.
-    drop = text(f'DROP TABLE IF EXISTS "{test_schema}".jobs')
-    with schema_engine.begin() as conn:
-        conn.execute(drop)
-        conn.execute(
-            text(JOBS_FIXTURE.replace("CREATE TABLE jobs", f'CREATE TABLE "{test_schema}".jobs'))
-        )
-    yield schema_engine
-    with schema_engine.begin() as conn:
-        conn.execute(drop)
+def jobs_engine(worker_engine: Engine, owner_engine: Engine) -> Iterator[Engine]:
+    """The worker engine, with a fresh workspace whose deletion clears its jobs."""
+    with owner_engine.begin() as conn:
+        _workspace["id"] = new_workspace(conn, new_user(conn), "Queue")
+    yield worker_engine
+    with owner_engine.begin() as conn:
+        conn.execute(text("DELETE FROM workspaces WHERE id = :ws"), {"ws": _workspace.pop("id")})
 
 
 def _enqueue(
     engine: Engine, job_type: str = "ingest", priority: int = 5, **cols: object
 ) -> uuid.UUID:
+    # run_after is set a second in the past: the WSL clock is corrected about every 30 s
+    # (Hyper-V time sync), and a small backward step between this insert and the claim
+    # would otherwise make a brand-new job look scheduled for the future (F-07).
     with engine.begin() as conn:
+        bind(conn, _workspace["id"])
         return conn.execute(
             text(
-                "INSERT INTO jobs (workspace_id, job_type, priority, payload) "
-                "VALUES (:ws, :t, :p, CAST(:payload AS jsonb)) RETURNING id"
+                "INSERT INTO jobs (workspace_id, job_type, priority, payload, run_after) "
+                "VALUES (:ws, :t, :p, CAST(:payload AS jsonb), now() - interval '1 second')"
+                " RETURNING id"
             ),
-            {"ws": uuid.uuid4(), "t": job_type, "p": priority, "payload": json.dumps(cols)},
+            {"ws": _workspace["id"], "t": job_type, "p": priority, "payload": json.dumps(cols)},
         ).scalar_one()
 
 

@@ -5,9 +5,10 @@ never block each other. A claim, its heartbeat and its checkpoints are ordinary 
 crashed worker's job is reclaimed once its heartbeat is stale. Steps must be idempotent:
 the guarantee is *at-least-once* execution with checkpoints, not exactly-once.
 
-The ``jobs`` table itself is created by the schema migration (next task). ``JobQueue``
-works against it unchanged; until it exists ``table_exists()`` returns ``False`` and the
-worker idles.
+The ``jobs`` table is created by migration 0002. Under row-level security the worker's
+queue policy lets claims, heartbeats and finishes see every workspace's jobs; each step
+then binds its transaction to the job's workspace (``JobContext.step``). Before the
+migration runs, ``table_exists()`` returns ``False`` and the worker idles.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Baseline: require pgvector >= 0.8 in the database.
 
-The 54 tables of D07/D08 start in revision 0002 (schema task). This revision only makes
+The 54 tables of D07/D08 are created by revision 0002. This revision only makes
 sure the ``vector`` extension exists. ``vector`` is not a trusted extension, so it is
 normally created once by a superuser in database/bootstrap; ``IF NOT EXISTS`` makes this
 step a no-op then, and a clear error is raised if it is missing and cannot be created.

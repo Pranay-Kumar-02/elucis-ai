@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from alembic import context
 
+import elucis.db.models  # noqa: F401  (registers the D07 tables on Base.metadata)
 from elucis.core.config import get_settings
 from elucis.db.base import Base
 from elucis.db.engine import build_engine

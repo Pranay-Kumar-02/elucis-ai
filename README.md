@@ -8,7 +8,7 @@ Built as the *AI Product Manager Copilot* project (the name used in the SRS and 
 
 Infosys Springboard Virtual Internship 7.0 · Batch 5 · Project #Z-5-1 · Group 2 (Varshini, Lalitha, Monika, Pranay, Prasunabhika)
 
-**Status:** foundation and source fetching are built and tested: backend and frontend foundations, the database connection with pgvector, local model runtime checks, and reading, matching and validating CSV, JSON, TXT and pasted feedback (Imports screen). The 54-table schema, authentication and the import pipeline come next. The requirements are in [`docs/requirements/SRS_v1.0.md`](docs/requirements/SRS_v1.0.md) and the design is in [`docs/design/`](docs/design/README.md).
+**Status:** foundation, source fetching and the database schema are built and tested: backend and frontend foundations, local model runtime checks, reading, matching and validating CSV, JSON, TXT and pasted feedback (Imports screen), and the full 54-table schema with row-level security on PostgreSQL 18.7 + pgvector. Authentication and the import pipeline come next. The requirements are in [`docs/requirements/SRS_v1.0.md`](docs/requirements/SRS_v1.0.md) and the design is in [`docs/design/`](docs/design/README.md).
 
 ## Stack
 
@@ -66,7 +66,7 @@ backend/                     FastAPI modular monolith + worker (Python 3.12, uv)
     security/                Argon2id password hashing
     workers/                 PostgreSQL job queue and worker runtime
     schemas/                 shared API schemas
-  migrations/                Alembic (0001 baseline; schema starts at 0002)
+  migrations/                Alembic (0001 pgvector baseline, 0002 the 54-table schema)
   tests/                     pytest: unit, API, real-database and job-queue tests
 frontend/                    React app (pnpm)
   src/app/                   providers, routes, router

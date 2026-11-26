@@ -51,19 +51,21 @@ Database tests need `TEST_DATABASE_URL`; without it they are skipped.
 
 ## Status (25 Nov 2026)
 
-Implemented and verified (195 backend tests, 25 frontend tests, build):
+Implemented and verified (249 backend tests with 0 skipped, 25 frontend tests, build; real PostgreSQL 18.7 + pgvector 0.8.7 on this laptop):
 - Foundation: settings, errors, logging, middleware, health endpoints, database engines and RLS helper, Alembic baseline, job queue worker, Ollama gateway, Argon2id hashing, app shell with D12 navigation and themes.
 - Source fetching (SVC-02 + SVC-04, IMP-17 to IMP-20): CSV/JSON/TXT/pasted-text reading with encoding, delimiter and malformed-row handling; column-mapping suggestions and rules; row validation and normalisation to D07 names; development endpoints `POST /api/v1/dev/sources/{preview,validate,fetch}` (need `ENABLE_DEV_ENDPOINTS=true`); Imports screen (upload or paste → preview → match columns → check records).
+- Database schema (migration 0002, IMP-22 to IMP-26): the 54 D07 tables, composite tenant keys, CHECKs, B-tree/GIN/HNSW indexes, `raw_text` trigger, forced RLS on 48 tenant tables, per-role grants (audit append-only), ORM models in `backend/src/elucis/db/models/` proven identical to the live schema. Applied to `elucis_dev`.
 
-Not built yet: the 54 D07/D08 tables (migration 0002), authentication and workspaces, API-14/API-15 and the ingest job, cleaning/PII/duplicates (SVC-05 onwards), all AI calls CP-01 to CP-10, the other production screens. "Start import" stays disabled until the database exists.
+Not built yet: authentication and workspaces, API-14/API-15 and the ingest job, cleaning/PII/duplicates (SVC-05 onwards), all AI calls CP-01 to CP-10, the other production screens. "Start import" stays disabled until the database exists.
 
 This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-db.ps1 start`), databases `elucis_dev` and `elucis_test`, `.env` created; Ollama 0.40.4 with `qwen3:4b` and `qwen3-embedding:0.6b` (measured dimension 1024, F-02 closed; `qwen3:4b` leaks reasoning into free-text replies, F-01 open); Node 22.23.5 (IMP-05 closed).
 
 ## Next tasks, in order
 
-1. Set up PostgreSQL in WSL, then write migration 0002 with the D07/D08 tables (confirm the 1024 embedding dimension first, F-02).
-2. Authentication and workspaces (SVC-01, RLS by `app.workspace_id`).
-3. API-14/API-15 and the ingest job, reusing `modules/ingestion` unchanged.
+1. Authentication and workspaces (SVC-01, RLS by `app.workspace_id`, the `workspace.deleted` audit rule IMP-24).
+2. API-14/API-15 and the ingest job, reusing `modules/ingestion` unchanged.
+
+Open decisions for the owner: F-06 (keyword search and the GIN index under RLS) before SVC-14; F-01 (`qwen3:4b` vs `qwen3:4b-instruct`) before any free-text CP call.
 
 ## Housekeeping
 
