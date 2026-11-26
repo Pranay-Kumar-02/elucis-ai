@@ -65,7 +65,7 @@ This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-
 1. Authentication and workspaces (SVC-01, RLS by `app.workspace_id`, the `workspace.deleted` audit rule IMP-24).
 2. API-14/API-15 and the ingest job, reusing `modules/ingestion` unchanged.
 
-Open decisions for the owner: F-06 (keyword search and the GIN index under RLS) before SVC-14; F-01 (`qwen3:4b` vs `qwen3:4b-instruct`) before any free-text CP call.
+Decided follow-ups: when building SVC-14, measure keyword-search latency on realistic volume; if it misses the NFR target, add a SECURITY DEFINER search function with leak tests (F-06, never mark pg_catalog functions LEAKPROOF). Before the first free-text CP call, benchmark `qwen3:4b-instruct` against `qwen3:4b` (F-01).
 
 ## Housekeeping
 

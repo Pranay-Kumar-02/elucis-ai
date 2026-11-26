@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import base64
+import os
+
 import pytest
 from pydantic import ValidationError
 
+from elucis.core.config import is_fernet_key
 from tests.conftest import make_settings
+
+FERNET_KEY = base64.urlsafe_b64encode(os.urandom(32)).decode()
 
 
 def test_defaults_are_local_and_safe() -> None:
@@ -46,7 +52,7 @@ def test_production_hides_diagnostics_by_default() -> None:
         enable_dev_endpoints=False,
         database_url="postgresql://u:p@localhost/db",
         session_secret="x" * 32,
-        app_encryption_key="y" * 32,
+        app_encryption_key=FERNET_KEY,
     )
     assert s.diagnostics_enabled is False
 
@@ -66,3 +72,36 @@ def test_worker_and_migration_urls_fall_back_to_api_url() -> None:
 def test_unknown_log_level_rejected() -> None:
     with pytest.raises(ValidationError):
         make_settings(log_level="LOUD")
+
+
+def test_a_fernet_key_is_accepted() -> None:
+    assert len(FERNET_KEY) == 44
+    assert is_fernet_key(FERNET_KEY)
+    s = make_settings(app_encryption_key=FERNET_KEY)
+    assert s.app_encryption_key is not None
+    assert s.app_encryption_key.get_secret_value() == FERNET_KEY
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "k" * 32,  # the old setup scripts' format: random text, not a key
+        "k" * 64,
+        FERNET_KEY.rstrip("="),  # padding missing
+        base64.urlsafe_b64encode(os.urandom(31)).decode().ljust(44, "="),  # 31 bytes
+        base64.b64encode(bytes([0xFB]) * 32).decode(),  # standard alphabet: '+' and '/'
+        "!" * 43 + "=",
+    ],
+)
+def test_an_invalid_encryption_key_fails_at_startup_without_echoing_it(value: str) -> None:
+    assert not is_fernet_key(value)
+    with pytest.raises(ValidationError) as caught:
+        make_settings(app_encryption_key=value)
+    message = str(caught.value)
+    assert "APP_ENCRYPTION_KEY is not a valid Fernet key" in message
+    assert "20-setup-project.ps1" in message
+    assert value not in message
+
+
+def test_the_encryption_key_is_optional_outside_production() -> None:
+    assert make_settings(app_encryption_key=None).app_encryption_key is None

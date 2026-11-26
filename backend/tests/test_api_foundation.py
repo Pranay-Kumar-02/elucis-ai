@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Iterator
 
 import pytest
@@ -149,7 +150,7 @@ def test_docs_disabled_in_production() -> None:
             enable_dev_endpoints=False,
             database_url="postgresql://u:p@127.0.0.1:1/x",
             session_secret="s" * 32,
-            app_encryption_key="k" * 32,
+            app_encryption_key=base64.urlsafe_b64encode(bytes(32)).decode(),
         )
     )
     with TestClient(app) as c:

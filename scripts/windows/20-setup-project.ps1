@@ -34,6 +34,7 @@ function Resolve-EnvValue([string]$Key, [string]$Value, [hashtable]$Passwords) {
         '^(DATABASE_URL|TEST_DATABASE_API_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.api) }
         '^(DATABASE_WORKER_URL|TEST_DATABASE_WORKER_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.worker) }
         '^(DATABASE_MIGRATION_URL|TEST_DATABASE_URL)$' { return $Value.Replace('CHANGE_ME', $Passwords.owner) }
+        '^APP_ENCRYPTION_KEY$' { if ($Value -eq 'CHANGE_ME') { return New-FernetKey } }
         default { if ($Value -eq 'CHANGE_ME') { return New-Secret 48 } }
     }
     return $Value
@@ -59,9 +60,22 @@ if (Test-Path $envPath) {
         [System.IO.File]::AppendAllText($envPath, "$key=$value`n", (New-Object System.Text.UTF8Encoding($false)))
         $added += $key
     }
+    # Older setups wrote APP_ENCRYPTION_KEY as a plain random string, which Fernet rejects.
+    # Replace only that line; nothing is encrypted with the key before SVC-20 exists.
+    $repaired = $false
+    if ($current.ContainsKey('APP_ENCRYPTION_KEY') -and -not (Test-FernetKey $current['APP_ENCRYPTION_KEY'])) {
+        $lines = foreach ($line in [System.IO.File]::ReadAllLines($envPath)) {
+            if ($line -match '^\s*APP_ENCRYPTION_KEY\s*=') { "APP_ENCRYPTION_KEY=$(New-FernetKey)" } else { $line }
+        }
+        Write-Utf8NoBom $envPath (($lines -join "`n") + "`n")  # same file: its ACL is kept
+        $repaired = $true
+        Write-Ok 'APP_ENCRYPTION_KEY was not a valid Fernet key; replaced with a new one (not shown).'
+    }
     if ($added) { Write-Ok ".env already exists; added new keys (values not shown): $($added -join ', ')" }
-    else { Write-Ok '.env already exists; left unchanged.' }
-    $report.steps.env = if ($added) { "kept existing, added $($added.Count) keys" } else { 'kept existing' }
+    elseif (-not $repaired) { Write-Ok '.env already exists; left unchanged.' }
+    $report.steps.env = if ($added -or $repaired) {
+        "kept existing, added $($added.Count) keys, encryption key repaired: $repaired"
+    } else { 'kept existing' }
 } else {
     $passwords = @{ owner = New-Secret 24; api = New-Secret 24; worker = New-Secret 24 }
     $lines = foreach ($line in [System.IO.File]::ReadAllLines($examplePath)) {

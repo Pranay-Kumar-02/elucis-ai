@@ -7,6 +7,9 @@ All configuration comes from environment variables, optionally loaded from the r
 
 from __future__ import annotations
 
+import base64
+import binascii
+import re
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
@@ -47,6 +50,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        # A rejected value is often a secret (a key, a URL with a password): never echo it.
+        hide_input_in_errors=True,
     )
 
     # ---- application ----
@@ -112,6 +117,14 @@ class Settings(BaseSettings):
                 raise ValueError(f"Invalid CORS origin {origin!r}: use scheme://host[:port]")
         return value
 
+    @field_validator("app_encryption_key")
+    @classmethod
+    def _check_fernet_key(cls, value: SecretStr | None) -> SecretStr | None:
+        """Fail at startup, never at first use, when the key cannot work (AGR-16)."""
+        if value is not None and not is_fernet_key(value.get_secret_value()):
+            raise ValueError(FERNET_KEY_HELP)
+        return value
+
     @field_validator("log_level")
     @classmethod
     def _check_level(cls, value: str) -> str:
@@ -157,6 +170,27 @@ class Settings(BaseSettings):
     def dsn_redacted(self, role: str = "api") -> str | None:
         raw = self.dsn(role)
         return _redact_dsn(raw) if raw else None
+
+
+FERNET_KEY_HELP = (
+    "APP_ENCRYPTION_KEY is not a valid Fernet key. It must be 32 random bytes in URL-safe"
+    " base64 (44 characters, ending in '='). Run scripts/windows/20-setup-project.ps1 to"
+    ' replace it, or generate one with: python -c "import base64, os;'
+    ' print(base64.urlsafe_b64encode(os.urandom(32)).decode())"'
+)
+
+
+_FERNET_KEY_SHAPE = re.compile(r"[A-Za-z0-9_-]{43}=")  # URL-safe alphabet only
+
+
+def is_fernet_key(value: str) -> bool:
+    """A Fernet key: 32 bytes, URL-safe base64 with padding (44 characters)."""
+    if not _FERNET_KEY_SHAPE.fullmatch(value):
+        return False
+    try:
+        return len(base64.urlsafe_b64decode(value)) == 32
+    except (binascii.Error, ValueError):
+        return False
 
 
 @lru_cache(maxsize=1)

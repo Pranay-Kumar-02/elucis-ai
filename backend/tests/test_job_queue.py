@@ -38,15 +38,17 @@ def jobs_engine(worker_engine: Engine, owner_engine: Engine) -> Iterator[Engine]
 def _enqueue(
     engine: Engine, job_type: str = "ingest", priority: int = 5, **cols: object
 ) -> uuid.UUID:
-    # run_after is set a second in the past: the WSL clock is corrected about every 30 s
-    # (Hyper-V time sync), and a small backward step between this insert and the claim
-    # would otherwise make a brand-new job look scheduled for the future (F-07).
+    # run_after is an hour in the past: the WSL clock is corrected about every 30 s (Hyper-V
+    # time sync), and a backward step between this insert and the claim would otherwise make
+    # a brand-new job look scheduled for the future (F-07). An hour is far beyond any
+    # correction; ordering still comes from priority, because every test job gets the same
+    # offset.
     with engine.begin() as conn:
         bind(conn, _workspace["id"])
         return conn.execute(
             text(
                 "INSERT INTO jobs (workspace_id, job_type, priority, payload, run_after) "
-                "VALUES (:ws, :t, :p, CAST(:payload AS jsonb), now() - interval '1 second')"
+                "VALUES (:ws, :t, :p, CAST(:payload AS jsonb), now() - interval '1 hour')"
                 " RETURNING id"
             ),
             {"ws": _workspace["id"], "t": job_type, "p": priority, "payload": json.dumps(cols)},

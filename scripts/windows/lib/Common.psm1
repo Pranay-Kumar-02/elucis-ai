@@ -82,6 +82,20 @@ function New-Secret([int]$Bytes = 32) {
     ([Convert]::ToBase64String($buffer)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
+function New-FernetKey {
+    # Fernet key: 32 random bytes, URL-safe base64 WITH padding (44 characters).
+    $buffer = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($buffer) } finally { $rng.Dispose() }
+    ([Convert]::ToBase64String($buffer)).Replace('+', '-').Replace('/', '_')
+}
+
+function Test-FernetKey([string]$Value) {
+    if ($Value -notmatch '^[A-Za-z0-9_-]{43}=$') { return $false }
+    try { return ([Convert]::FromBase64String($Value.Replace('-', '+').Replace('_', '/'))).Length -eq 32 }
+    catch { return $false }
+}
+
 function Read-DotEnv([string]$Path) {
     $values = @{}
     if (-not (Test-Path $Path)) { return $values }
