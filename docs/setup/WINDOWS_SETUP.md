@@ -8,7 +8,7 @@ This guide is for the team laptops (Windows 11, NVIDIA GPU). Every step is scrip
 |---|---|---|
 | Project folder **outside OneDrive**, ideally without spaces (for example `C:\dev\AI-Product-Manager-Copilot`) | OneDrive syncs and locks `.venv` and `node_modules` (tens of thousands of files) during installs | `scripts\windows\10-check-prerequisites.ps1` warns |
 | uv | Python 3.12 and locked backend dependencies | `uv --version` |
-| Node.js **22.22.0 or newer** (current LTS recommended) | Vite 8 and React Router 8 | `node --version` |
+| Node.js **22.22.0 or newer** (latest Node.js 22 LTS: `winget install --id OpenJS.NodeJS.22 --exact`) | Vite 8 and React Router 8 | `node --version` |
 | pnpm 12 | Locked frontend dependencies (the project pins 12.16.1) | `pnpm --version` |
 | WSL2 with Ubuntu | Runs PostgreSQL 18 + pgvector (see section 4) | `wsl --list --verbose` |
 | Ollama app | Local models on the GPU | `ollama --version` |

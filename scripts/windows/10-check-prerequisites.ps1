@@ -59,12 +59,12 @@ if ($nodeRaw -match '^v(\d+)\.(\d+)\.(\d+)') {
 }
 if (-not $nodeOk) {
     Write-Warn "Node.js $nodeRaw is older than 22.22.0 (React Router 8 requires it; newer"
-    Write-Info 'releases also carry security fixes). Upgrade to the current Node.js LTS with:'
-    Write-Info '  winget install --id OpenJS.NodeJS.LTS --exact --source winget'
+    Write-Info 'releases also carry security fixes). Upgrade to the latest Node.js 22 LTS with:'
+    Write-Info '  winget install --id OpenJS.NodeJS.22 --exact --source winget'
     if (-not $NoPrompt -and (Test-CommandExists 'winget')) {
         $answer = Read-Host '  Upgrade Node.js now with winget? Windows will ask for admin approval [y/N]'
         if ($answer -match '^(y|yes)$') {
-            [void](Invoke-Native 'winget' @('install', '--id', 'OpenJS.NodeJS.LTS', '--exact', '--source', 'winget',
+            [void](Invoke-Native 'winget' @('install', '--id', 'OpenJS.NodeJS.22', '--exact', '--source', 'winget',
                     '--accept-package-agreements', '--accept-source-agreements'))
             $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
             $nodeRaw = Get-NativeOutput 'node' @('--version')
@@ -74,7 +74,7 @@ if (-not $nodeOk) {
         }
     }
 }
-Add-Check 'Node.js' $nodeOk ($(if ($nodeRaw) { $nodeRaw } else { 'not found' })) '>= 22.22.0' 'winget install --id OpenJS.NodeJS.LTS --exact --source winget  (then open a new PowerShell window)'
+Add-Check 'Node.js' $nodeOk ($(if ($nodeRaw) { $nodeRaw } else { 'not found' })) '>= 22.22.0' 'winget install --id OpenJS.NodeJS.22 --exact --source winget  (then open a new PowerShell window)'
 $pnpm = Get-NativeOutput 'pnpm' @('--version')
 Add-Check 'pnpm' ([bool]$pnpm) ($(if ($pnpm) { $pnpm } else { 'not found' })) '12.x (project pins 12.16.1)' 'npm install -g pnpm@12.16.1'
 

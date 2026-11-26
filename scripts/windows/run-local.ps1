@@ -14,10 +14,7 @@
   Known limits of this run (shown honestly in the app):
     * No PostgreSQL yet and no .env -> database checks report "not configured".
     * qwen3:4b is not pulled yet -> model runtime reports "model not pulled".
-    * Node.js 22.20.0 is below the project's minimum 22.22.0 (React Router 8). For this run
-      only, pnpm's engine check is relaxed with a command-line flag; no file is changed.
-      React Router runs inside the browser bundle, so the Node version does not affect it
-      at runtime; Vite 8 itself supports Node 22.12+.
+    * pnpm enforces the Node.js minimum (22.22.0, IMP-05); an older Node stops the install.
 
   Stop the app by closing the two windows (or Ctrl+C in each).
 
@@ -74,8 +71,8 @@ Write-Info "Python in venv: $($report.steps.python)"
 
 Write-Step 'Frontend dependencies (frontend\node_modules, project-local)'
 # Same reasoning: pnpm install --frozen-lockfile is a no-op when node_modules is complete.
-Write-Info 'Syncing frontend\node_modules with pnpm-lock.yaml (engine check relaxed for this run only) ...'
-$code = Invoke-Native 'pnpm' @('install', '--frozen-lockfile', '--config.engine-strict=false') -WorkingDirectory $frontend
+Write-Info 'Syncing frontend\node_modules with pnpm-lock.yaml ...'
+$code = Invoke-Native 'pnpm' @('install', '--frozen-lockfile') -WorkingDirectory $frontend
 if ($code -ne 0) { Stop-WithReport "pnpm install failed (exit $code). Messages above show why; diag-network.ps1 checks downloads." }
 Write-Ok 'frontend\node_modules matches pnpm-lock.yaml.'
 

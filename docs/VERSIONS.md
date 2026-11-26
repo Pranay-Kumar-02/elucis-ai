@@ -10,7 +10,7 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 |---|---|---|
 | Python | 3.12 (uv-managed CPython build) | `backend/.python-version`, `requires-python = ">=3.12,<3.13"` |
 | uv | 0.9 or newer (laptop: 0.12.12) | `required-version` in `pyproject.toml` |
-| Node.js | 22.22.0 or newer; current LTS recommended | `engines` in `package.json`, enforced by `engineStrict` |
+| Node.js | 22.22.0 or newer, latest Node.js 22 LTS (laptop: 22.23.5) | `engines` in `package.json`, enforced by `engineStrict` (IMP-05) |
 | pnpm | 12.16.1 | `packageManager` in `package.json`, recorded in the lockfile |
 | PostgreSQL | 18.7 | `install-postgres.sh` installs exactly `postgresql-18=18.7-*` from PGDG |
 | pgvector | 0.8.7 | `install-postgres.sh` installs exactly `postgresql-18-pgvector=0.8.7-*`; migration 0001 refuses < 0.8.0 |
