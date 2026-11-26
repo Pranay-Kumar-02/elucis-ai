@@ -15,7 +15,7 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 | PostgreSQL | 18.7 | `install-postgres.sh` installs exactly `postgresql-18=18.7-*` from PGDG |
 | pgvector | 0.8.7 | `install-postgres.sh` installs exactly `postgresql-18-pgvector=0.8.7-*`; migration 0001 refuses < 0.8.0 |
 | Ollama | laptop: 0.40.4 (latest release 0.40.18) | Not pinned by the project; recorded per run |
-| Models | `qwen3:4b` (digest `359d7dd4bcda`), `qwen3-embedding:0.6b` | `.env`; digests recorded by `40-setup-ollama.ps1` |
+| Models | `qwen3:4b` (digest `359d7dd4bcda`, Q4_K_M, 3.18 GB in VRAM), `qwen3-embedding:0.6b` (digest `ac6da0dfba84`, Q8_0, measured dimension 1024) | `.env`; digests recorded by `40-setup-ollama.ps1` (laptop, 26 Nov 2026) |
 
 ## Backend (Python, direct dependencies)
 

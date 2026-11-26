@@ -23,7 +23,12 @@ def _vector(seed: float) -> list[float]:
     return [seed] + [0.01] * (DIM - 1)
 
 
-def _fake_ollama(models: list[str]) -> httpx2.MockTransport:
+LEAKED_REASONING = (
+    'Hmm, the user wants me to reply with just the word "READY". Simple.\n</think>\n\nREADY'
+)
+
+
+def _fake_ollama(models: list[str], reply: str = "READY") -> httpx2.MockTransport:
     def handler(req: httpx2.Request) -> httpx2.Response:
         path = req.url.path
         if path == "/api/version":
@@ -48,7 +53,7 @@ def _fake_ollama(models: list[str]) -> httpx2.MockTransport:
             content = (
                 json.dumps({"category": "bug_report", "sentiment": "negative", "summary": "crash"})
                 if "format" in body
-                else "READY"
+                else reply
             )
             return httpx2.Response(
                 200,
@@ -120,6 +125,31 @@ def test_quick_check_skips_json_test(fake_models: list[str], tmp_path: Path) -> 
     assert check.main(["--quick", "--report", str(out)]) == 0
     names = [c["name"] for c in json.loads(out.read_text(encoding="utf-8"))["checks"]]
     assert "json_structured_output" not in names
+
+
+def test_reasoning_leaked_into_the_reply_fails_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # qwen3:4b (Thinking-2507) ignores think=false and writes its reasoning, a </think> tag
+    # and then the answer into the content field (F-01). That must not count as compliance.
+    def factory(settings: Any = None, **_: Any) -> OllamaClient:
+        return OllamaClient(
+            settings,
+            transport=_fake_ollama(["qwen3:4b", "qwen3-embedding:0.6b"], LEAKED_REASONING),
+        )
+
+    monkeypatch.setattr(check, "OllamaClient", factory)
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test")
+    check.get_settings.cache_clear()
+    try:
+        out = tmp_path / "leak.json"
+        assert check.main(["--quick", "--report", str(out)]) == 1
+    finally:
+        check.get_settings.cache_clear()
+    report = json.loads(out.read_text(encoding="utf-8"))
+    generation = next(c for c in report["checks"] if c["name"] == "basic_generation")
+    assert generation["ok"] is False
+    assert generation["reasoning_in_content"] is True
 
 
 def test_missing_model_fails_the_report(fake_models: list[str], tmp_path: Path) -> None:

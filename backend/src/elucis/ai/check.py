@@ -119,15 +119,21 @@ def run(quick: bool) -> dict[str, Any]:
         def generation() -> tuple[bool, dict[str, Any], None]:
             result = client.chat(
                 [{"role": "user", "content": "Reply with the single word READY and nothing else."}],
-                num_predict=16,
+                # A compliant model stops after one or two tokens. The larger budget lets a
+                # model that reasons inline reach its </think> tag, so the leak is detected.
+                num_predict=512,
             )
             text = result.content.strip()
             return (
-                "READY" in text.upper(),
+                # Exact compliance: a reply that merely mentions READY (for example inside
+                # leaked reasoning) is a failure, not a pass.
+                text.strip(" .!\"'").upper() == "READY",
                 {
                     "reply": text[:60],
-                    # think=false is sent; a thinking-only model may still reason (F-01).
+                    # think=false is sent; a thinking-only model may still reason (F-01),
+                    # either in the separate thinking field or inline in the content.
                     "thinking_chars": len(result.thinking or ""),
+                    "reasoning_in_content": "</think>" in text or text.startswith("<think>"),
                     "load_ms": result.stats.load_ms,
                     "output_tokens": result.stats.output_tokens,
                     "tokens_per_second": result.stats.tokens_per_second,
