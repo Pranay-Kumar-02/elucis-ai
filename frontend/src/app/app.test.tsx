@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { healthyResponse, json, mockFetch, renderRoute, requestPath } from "@/test/utils";
+import { healthyResponse, json, mockFetch, renderSignedIn, requestPath } from "@/test/utils";
 
 const adapters = [
   {
@@ -42,7 +42,7 @@ const noDatabase = {
 describe("application shell", () => {
   it("shows product branding only, never internal project labels", async () => {
     mockFetch({ "/api/v1/health": () => json(noDatabase, 503) });
-    renderRoute("/");
+    await renderSignedIn("/");
     expect(
       await screen.findByRole("heading", { name: "Welcome to Elucis AI" }),
     ).toBeInTheDocument();
@@ -59,9 +59,9 @@ describe("application shell", () => {
     }
   });
 
-  it("lists every D12 section and only links the ones that work", () => {
+  it("lists every D12 section and only links the ones that work", async () => {
     mockFetch({ "/api/v1/health": () => json(healthyResponse) });
-    renderRoute("/");
+    await renderSignedIn("/");
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
     expect(within(nav).getByRole("link", { name: "Imports" })).toHaveAttribute("href", "/imports");
@@ -81,7 +81,7 @@ describe("application shell", () => {
 
   it("summarises service health and explains why AI is paused", async () => {
     mockFetch({ "/api/v1/health": () => json(noDatabase, 503) });
-    renderRoute("/");
+    await renderSignedIn("/");
     expect(await screen.findByRole("link", { name: "Database not connected" })).toHaveAttribute(
       "href",
       "/settings/system",
@@ -91,19 +91,20 @@ describe("application shell", () => {
         selector: "span",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("0 of 3 complete")).toBeInTheDocument();
+    // Signed in with a workspace: only that step is done.
+    expect(screen.getByText("1 of 4 complete")).toBeInTheDocument();
   });
 
   it("says when the server cannot be reached", async () => {
     mockFetch({ "/api/v1/health": () => Promise.reject(new TypeError("Failed to fetch")) });
-    renderRoute("/");
+    await renderSignedIn("/");
     expect(await screen.findByText("Server not reachable")).toBeInTheDocument();
     expect(screen.getByText(/The server isn't responding/)).toBeInTheDocument();
   });
 
-  it("renders a not-found page", () => {
+  it("renders a not-found page", async () => {
     mockFetch({ "/api/v1/health": () => json(healthyResponse) });
-    renderRoute("/does-not-exist");
+    await renderSignedIn("/does-not-exist");
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
   });
 });
@@ -114,7 +115,7 @@ describe("redirects", () => {
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
     });
-    renderRoute("/dev/file-preview");
+    await renderSignedIn("/dev/file-preview");
     expect(await screen.findByRole("heading", { name: "Imports" })).toBeInTheDocument();
   });
 });
@@ -145,7 +146,7 @@ describe("system status page", () => {
           503,
         ),
     });
-    renderRoute("/settings/system");
+    await renderSignedIn("/settings/system");
     expect(await screen.findByText("18.7")).toBeInTheDocument();
     expect(screen.getByText("pgvector 0.8.7")).toBeInTheDocument();
     expect(await screen.findByText("Not installed")).toBeInTheDocument();
@@ -230,7 +231,7 @@ describe("imports page", () => {
       "/api/v1/dev/sources/preview": () => json(preview),
       "/api/v1/dev/sources/validate": () => json(report),
     });
-    renderRoute("/imports");
+    await renderSignedIn("/imports");
     expect(await screen.findByText("Zendesk tickets")).toBeInTheDocument();
     expect(
       await screen.findByText("Importing starts once the database is connected"),
@@ -276,7 +277,7 @@ describe("imports page", () => {
       "/api/v1/dev/sources/adapters": () => json(adapters),
       "/api/v1/dev/sources/preview": () => json({ ...preview, suggested_mapping: {} }),
     });
-    renderRoute("/imports");
+    await renderSignedIn("/imports");
     await userEvent.upload(screen.getByLabelText(/choose a file/i), new File(["x"], "r.csv"));
     expect(
       await screen.findByText(/Choose a column for Feedback text to continue/),
@@ -303,7 +304,7 @@ describe("imports page", () => {
           suggested_mapping: { text: "text" },
         }),
     });
-    renderRoute("/imports");
+    await renderSignedIn("/imports");
     await userEvent.click(screen.getByRole("radio", { name: "Paste text" }));
     await userEvent.type(screen.getByLabelText("Pasted feedback"), "Export is slow");
     await userEvent.click(screen.getByRole("button", { name: "Preview text" }));
@@ -332,7 +333,7 @@ describe("imports page", () => {
           422,
         ),
     });
-    renderRoute("/imports");
+    await renderSignedIn("/imports");
     await userEvent.upload(
       screen.getByLabelText(/choose a file/i),
       new File(["{"], "bad.json", { type: "application/json" }),
@@ -348,7 +349,7 @@ describe("imports page", () => {
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
     });
-    renderRoute("/imports");
+    await renderSignedIn("/imports");
     const big = new File(["x"], "big.csv", { type: "text/csv" });
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     await userEvent.upload(screen.getByLabelText(/choose a file/i), big);

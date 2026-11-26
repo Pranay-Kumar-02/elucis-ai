@@ -8,7 +8,7 @@ Built as the *AI Product Manager Copilot* project (the name used in the SRS and 
 
 Infosys Springboard Virtual Internship 7.0 · Batch 5 · Project #Z-5-1 · Group 2 (Varshini, Lalitha, Monika, Pranay, Prasunabhika)
 
-**Status:** foundation, source fetching and the database schema are built and tested: backend and frontend foundations, local model runtime checks, reading, matching and validating CSV, JSON, TXT and pasted feedback (Imports screen), and the full 54-table schema with row-level security on PostgreSQL 18.7 + pgvector. Authentication and the import pipeline come next. The requirements are in [`docs/requirements/SRS_v1.0.md`](docs/requirements/SRS_v1.0.md) and the design is in [`docs/design/`](docs/design/README.md).
+**Status:** foundation, source fetching and the database schema are built and tested: backend and frontend foundations, local model runtime checks, reading, matching and validating CSV, JSON, TXT and pasted feedback (Imports screen), the full 54-table schema with row-level security on PostgreSQL 18.7 + pgvector, and accounts, sign-in, workspaces, members and roles. The import pipeline comes next. The requirements are in [`docs/requirements/SRS_v1.0.md`](docs/requirements/SRS_v1.0.md) and the design is in [`docs/design/`](docs/design/README.md).
 
 ## Stack
 

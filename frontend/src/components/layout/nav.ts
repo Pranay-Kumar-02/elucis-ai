@@ -1,5 +1,6 @@
 import {
   Bot,
+  Building2,
   ClipboardCheck,
   FileText,
   Inbox,
@@ -36,6 +37,9 @@ export const mainNav: NavItem[] = [
   { label: "Assistant", icon: Bot },
 ];
 
-export const footerNav: NavItem[] = [{ label: "Settings", icon: Settings, to: "/settings/system" }];
+export const footerNav: NavItem[] = [
+  { label: "Workspaces", icon: Building2, to: "/workspaces" },
+  { label: "Settings", icon: Settings, to: "/settings/general" },
+];
 
 export const UNAVAILABLE_HINT = "Available once feedback analysis is set up";

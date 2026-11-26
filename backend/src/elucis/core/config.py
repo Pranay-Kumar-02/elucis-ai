@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     worker_poll_interval_s: float = Field(default=2.0, gt=0)
     worker_heartbeat_interval_s: float = Field(default=15.0, gt=0)
 
+    # ---- sessions (D09 section 1, D10 section 2) ----
+    session_idle_minutes: int = Field(default=30, ge=1)  # A-07
+    session_absolute_hours: int = Field(default=12, ge=1)  # D10 proposal
+    session_cookie_secure: bool | None = None  # None -> True in production (HTTPS)
+
     # ---- secrets used by later modules (SEC-18) ----
     session_secret: SecretStr | None = None
     app_encryption_key: SecretStr | None = None
@@ -151,6 +156,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env is Environment.PRODUCTION
+
+    @property
+    def cookie_secure(self) -> bool:
+        if self.session_cookie_secure is None:
+            return self.is_production
+        return self.session_cookie_secure
 
     @property
     def diagnostics_enabled(self) -> bool:

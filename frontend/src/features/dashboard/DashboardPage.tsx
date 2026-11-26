@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { product } from "@/config/product";
 import { useHealth } from "@/features/system/queries";
 import { aiPausedReason } from "@/features/system/status";
+import { useActiveWorkspace } from "@/features/workspaces/active";
 import { cn } from "@/lib/utils";
 
 type StepState = "done" | "action" | "waiting";
@@ -42,6 +43,7 @@ export function DashboardPage() {
   const ai = health.data?.checks["model_runtime"];
   const dbReady = db?.status === "ok";
   const aiReason = aiPausedReason(ai);
+  const { active } = useActiveWorkspace();
 
   const steps: SetupStep[] = [
     {
@@ -50,6 +52,21 @@ export function DashboardPage() {
         ? "Feedback, analysis results and decisions are stored securely."
         : "Needed to store feedback, analysis results and decisions. An administrator sets this up once.",
       state: dbReady ? "done" : "action",
+    },
+    {
+      title: "Create a workspace",
+      detail: active
+        ? `You are working in “${active.workspace_name}”.`
+        : "A workspace holds one product’s feedback and decisions. Invite your team to it.",
+      state: active ? "done" : dbReady ? "action" : "waiting",
+      ...(!active &&
+        dbReady && {
+          action: (
+            <Button asChild size="sm" variant="outline">
+              <Link to="/workspaces">Create a workspace</Link>
+            </Button>
+          ),
+        }),
     },
     {
       title: "Install the AI models",

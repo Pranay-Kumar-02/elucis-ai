@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SettingsTabs } from "@/features/workspaces/SettingsTabs";
 import { useDatabaseHealth, useHealth, useModelRuntimeHealth } from "@/features/system/queries";
 import { aiPausedReason, checkLabel } from "@/features/system/status";
 import type { CheckStatus } from "@/lib/api/types";
@@ -84,6 +85,7 @@ export function SystemStatusPage() {
           </Button>
         }
       />
+      <SettingsTabs />
       {overall.isError && (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>The server isn't responding</AlertTitle>

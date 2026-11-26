@@ -15,11 +15,13 @@ import os
 import signal
 import socket
 import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 from sqlalchemy import Engine
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from elucis.core.logging import job_id_var
@@ -56,6 +58,8 @@ class Worker:
         poll_interval_s: float = 2.0,
         heartbeat_interval_s: float = 15.0,
         worker_id: str | None = None,
+        maintenance: Callable[[Connection], object] | None = None,
+        maintenance_interval_s: float = 3600.0,
     ) -> None:
         self.engine = engine
         self.handlers = handlers
@@ -64,6 +68,9 @@ class Worker:
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
         self.stopping = threading.Event()
         self._warned_no_table = False
+        self.maintenance = maintenance
+        self.maintenance_interval_s = maintenance_interval_s
+        self._next_maintenance = 0.0  # monotonic time; 0 means "at the first iteration"
 
     # ------------------------------------------------------------------ lifecycle
     def install_signal_handlers(self) -> None:
@@ -83,6 +90,7 @@ class Worker:
         )
         while not self.stopping.is_set():
             try:
+                self.run_maintenance_if_due()
                 worked = self.run_once()
             except Exception:
                 logger.exception("worker loop error; backing off")
@@ -92,6 +100,16 @@ class Worker:
         logger.info("worker stopped", extra={"worker_id": self.worker_id})
 
     # ------------------------------------------------------------------ one iteration
+    def run_maintenance_if_due(self) -> bool:
+        """Run the retention purges at most once per interval. True if they ran."""
+        if self.maintenance is None or time.monotonic() < self._next_maintenance:
+            return False
+        self._next_maintenance = time.monotonic() + self.maintenance_interval_s
+        with self.engine.begin() as conn:
+            result = self.maintenance(conn)
+        logger.info("maintenance done", extra={"result": repr(result)})
+        return True
+
     def run_once(self) -> bool:
         """Claim and run at most one job. Returns True if a job was processed."""
         with self.engine.begin() as conn:

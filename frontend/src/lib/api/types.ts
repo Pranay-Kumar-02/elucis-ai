@@ -139,3 +139,66 @@ export interface SourceInfoOut {
   requirement: string | null;
   notes: string | null;
 }
+
+// ---- Authentication and workspaces (D09 §4, API-01 to API-13) ----
+
+export type Role = "owner" | "editor" | "viewer";
+
+export interface UserOut {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+export interface MembershipOut {
+  workspace_id: string;
+  workspace_name: string;
+  role: Role;
+}
+
+export interface MeOut {
+  user: UserOut;
+  memberships: MembershipOut[];
+  csrf_token: string;
+}
+
+export interface WorkspaceOut {
+  id: string;
+  name: string;
+  description: string | null;
+  product_name: string | null;
+  product_description: string | null;
+  target_users: string | null;
+  glossary: Record<string, string>;
+  role: Role;
+  created_at: string;
+}
+
+export interface WorkspacePatch {
+  name?: string;
+  description?: string | null;
+  product_name?: string | null;
+  product_description?: string | null;
+  target_users?: string | null;
+  glossary?: Record<string, string>;
+}
+
+export interface MemberOut {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+  role: Role;
+  added_at: string;
+}
+
+export interface Page<T> {
+  items: T[];
+  next_cursor: string | null;
+}
+
+export interface JobRef {
+  job_id: string;
+  resource_id: string;
+  status: "queued";
+}

@@ -4,10 +4,18 @@ import type {
   DatabaseHealthOut,
   FilePreviewOut,
   HealthOut,
+  JobRef,
+  MemberOut,
+  MeOut,
   ModelRuntimeHealthOut,
+  Page,
+  Role,
   SourceInfoOut,
   SourceType,
+  UserOut,
   ValidationReportOut,
+  WorkspaceOut,
+  WorkspacePatch,
 } from "@/lib/api/types";
 
 /** Feedback comes from an uploaded file or from pasted text (FR-ING-10). */
@@ -55,4 +63,41 @@ export const api = {
       body: sourceForm(input, sourceType, mapping),
       timeoutMs: 120_000,
     }),
+
+  // ---- authentication (API-01 to API-04)
+  register: (body: { email: string; password: string; display_name?: string }) =>
+    apiRequest<UserOut>("/auth/register", { method: "POST", body }),
+  login: (body: { email: string; password: string }) =>
+    apiRequest<MeOut>("/auth/login", { method: "POST", body }),
+  logout: () => apiRequest<null>("/auth/logout", { method: "POST" }),
+  me: (signal?: AbortSignal) => apiRequest<MeOut>("/auth/me", { ...(signal && { signal }) }),
+  // ---- workspaces (API-05 to API-09)
+  workspaces: (signal?: AbortSignal) =>
+    apiRequest<Page<WorkspaceOut>>("/workspaces?limit=200", { ...(signal && { signal }) }),
+  createWorkspace: (body: { name: string; description?: string }) =>
+    apiRequest<WorkspaceOut>("/workspaces", { method: "POST", body }),
+  workspace: (id: string, signal?: AbortSignal) =>
+    apiRequest<WorkspaceOut>(`/workspaces/${id}`, { ...(signal && { signal }) }),
+  updateWorkspace: (id: string, body: WorkspacePatch) =>
+    apiRequest<WorkspaceOut>(`/workspaces/${id}`, { method: "PATCH", body }),
+  deleteWorkspace: (id: string, confirmName: string, idempotencyKey: string) =>
+    apiRequest<JobRef>(`/workspaces/${id}`, {
+      method: "DELETE",
+      body: { confirm_name: confirmName },
+      headers: { "Idempotency-Key": idempotencyKey },
+    }),
+  // ---- members (API-10 to API-13)
+  members: (id: string, signal?: AbortSignal) =>
+    apiRequest<Page<MemberOut>>(`/workspaces/${id}/members?limit=200`, {
+      ...(signal && { signal }),
+    }),
+  addMember: (id: string, body: { email: string; role: Role }) =>
+    apiRequest<MemberOut>(`/workspaces/${id}/members`, { method: "POST", body }),
+  changeRole: (id: string, userId: string, role: Role) =>
+    apiRequest<MemberOut>(`/workspaces/${id}/members/${userId}`, {
+      method: "PATCH",
+      body: { role },
+    }),
+  removeMember: (id: string, userId: string) =>
+    apiRequest<null>(`/workspaces/${id}/members/${userId}`, { method: "DELETE" }),
 };

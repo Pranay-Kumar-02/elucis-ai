@@ -29,7 +29,7 @@ Follow the SRS and design. Do not silently change a design decision or the stack
 
 ## Stack
 
-Backend: Python 3.12 (uv-managed), FastAPI 0.162.2, Pydantic 2.14, SQLAlchemy 2.1 (sync) + psycopg 3, Alembic, PostgreSQL 18.7 + pgvector 0.8.7 (in WSL2 Ubuntu, IMP-01), PostgreSQL job queue for the worker. Frontend: React 19, TypeScript 6.0.3, Vite 8, Tailwind 4, shadcn-style components, TanStack Query, React Router 8, pnpm 12.16.1, Node 22.22 or newer. AI: Ollama, `qwen3:4b` (generation), `qwen3-embedding:0.6b` (embeddings, `vector(1024)`).
+Backend: Python 3.12 (uv-managed), FastAPI 0.162.2, Pydantic 2.14, SQLAlchemy 2.1 (sync) + psycopg 3, Alembic, cryptography (Fernet, IMP-29), PostgreSQL 18.7 + pgvector 0.8.7 (in WSL2 Ubuntu, IMP-01), PostgreSQL job queue for the worker. Frontend: React 19, TypeScript 6.0.3, Vite 8, Tailwind 4, shadcn-style components, TanStack Query, React Router 8, pnpm 12.16.1, Node 22.22 or newer. AI: Ollama, `qwen3:4b` (generation), `qwen3-embedding:0.6b` (embeddings, `vector(1024)`).
 
 ## Commands (Windows, from the project root)
 
@@ -51,19 +51,20 @@ Database tests need `TEST_DATABASE_URL`; without it they are skipped.
 
 ## Status (25 Nov 2026)
 
-Implemented and verified (249 backend tests with 0 skipped, 25 frontend tests, build; real PostgreSQL 18.7 + pgvector 0.8.7 on this laptop):
+Implemented and verified (330 backend tests with 0 skipped, 38 frontend tests, build; real PostgreSQL 18.7 + pgvector 0.8.7 on this laptop):
 - Foundation: settings, errors, logging, middleware, health endpoints, database engines and RLS helper, Alembic baseline, job queue worker, Ollama gateway, Argon2id hashing, app shell with D12 navigation and themes.
 - Source fetching (SVC-02 + SVC-04, IMP-17 to IMP-20): CSV/JSON/TXT/pasted-text reading with encoding, delimiter and malformed-row handling; column-mapping suggestions and rules; row validation and normalisation to D07 names; development endpoints `POST /api/v1/dev/sources/{preview,validate,fetch}` (need `ENABLE_DEV_ENDPOINTS=true`); Imports screen (upload or paste → preview → match columns → check records).
 - Database schema (migration 0002, IMP-22 to IMP-26): the 54 D07 tables, composite tenant keys, CHECKs, B-tree/GIN/HNSW indexes, `raw_text` trigger, forced RLS on 48 tenant tables, per-role grants (audit append-only), ORM models in `backend/src/elucis/db/models/` proven identical to the live schema. Applied to `elucis_dev`.
+- Authentication and workspaces (SVC-01, IMP-28, IMP-29): API-01 to API-13, server-side sessions, CSRF, throttling, `WorkspaceAccess` (404 non-members, 403 + audit), workspace deletion job with the IMP-24 audit rule, worker retention purges; UI-01 screens (sign-in, registration, workspaces, settings, members, danger zone, switcher).
 
-Not built yet: authentication and workspaces, API-14/API-15 and the ingest job, cleaning/PII/duplicates (SVC-05 onwards), all AI calls CP-01 to CP-10, the other production screens. "Start import" stays disabled until the database exists.
+Not built yet: API-14/API-15 and the ingest job, cleaning/PII/duplicates (SVC-05 onwards), all AI calls CP-01 to CP-10, the other production screens. "Start import" stays disabled until the database exists.
 
 This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-db.ps1 start`), databases `elucis_dev` and `elucis_test`, `.env` created; Ollama 0.40.4 with `qwen3:4b` and `qwen3-embedding:0.6b` (measured dimension 1024, F-02 closed; `qwen3:4b` leaks reasoning into free-text replies, F-01 open); Node 22.23.5 (IMP-05 closed).
 
 ## Next tasks, in order
 
-1. Authentication and workspaces (SVC-01, RLS by `app.workspace_id`, the `workspace.deleted` audit rule IMP-24).
-2. API-14/API-15 and the ingest job, reusing `modules/ingestion` unchanged.
+1. API-14/API-15 and the ingest job (upload, `import_jobs`, `feedback_records`), reusing `modules/ingestion` unchanged and routes under `/workspaces/{ws}` with `EditorDep`; then turn on "Start import".
+2. Cleaning, PII masking and duplicates (SVC-05 onwards).
 
 Decided follow-ups: when building SVC-14, measure keyword-search latency on realistic volume; if it misses the NFR target, add a SECURITY DEFINER search function with leak tests (F-06, never mark pg_catalog functions LEAKPROOF). Before the first free-text CP call, benchmark `qwen3:4b-instruct` against `qwen3:4b` (F-01).
 

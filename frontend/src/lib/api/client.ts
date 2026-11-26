@@ -3,8 +3,8 @@
  *
  * - Every non-2xx response is parsed as the backend error envelope
  *   `{ error: { code, message, details, request_id } }` (D09 section 2) and thrown as ApiError.
- * - Credentials are sent so the session cookie works once authentication exists; unsafe
- *   methods will add the X-CSRF-Token header at that point (D09 section 1).
+ * - Credentials are sent so the HttpOnly session cookie travels with every request; unsafe
+ *   methods add the X-CSRF-Token header from GET /auth/me (D09 section 1).
  * - Requests time out (default 15 s) and can be cancelled through an AbortSignal.
  */
 import { env } from "@/lib/env";
@@ -55,6 +55,17 @@ export interface RequestOptions {
   timeoutMs?: number;
   /** Treat these non-2xx statuses as a normal response (for example 503 from /health). */
   acceptStatuses?: readonly number[];
+  /** Extra request headers, for example Idempotency-Key. */
+  headers?: Record<string, string>;
+}
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/** The session's CSRF token. Kept in memory only; GET /auth/me returns it again on reload. */
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
 }
 
 export function apiUrl(path: string): string {
@@ -63,8 +74,16 @@ export function apiUrl(path: string): string {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, signal, timeoutMs = 15_000, acceptStatuses = [] } = options;
-  const headers = new Headers({ Accept: "application/json" });
+  const {
+    method = "GET",
+    body,
+    signal,
+    timeoutMs = 15_000,
+    acceptStatuses = [],
+    headers: extraHeaders = {},
+  } = options;
+  const headers = new Headers({ Accept: "application/json", ...extraHeaders });
+  if (csrfToken && UNSAFE_METHODS.has(method)) headers.set("X-CSRF-Token", csrfToken);
   let payload: BodyInit | undefined;
   if (body instanceof FormData || typeof body === "string" || body instanceof Blob) {
     payload = body;

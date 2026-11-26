@@ -90,6 +90,60 @@ class DatabaseUnavailableError(AppError):
     message = "The database is not reachable."
 
 
+class NotAuthenticatedError(AppError):
+    status_code = HTTPStatus.UNAUTHORIZED
+    code = "not_authenticated"
+    message = "Sign in to continue."
+
+
+class SessionExpiredError(AppError):
+    status_code = HTTPStatus.UNAUTHORIZED
+    code = "session_expired"
+    message = "Your session has ended. Sign in again."
+
+
+class InvalidCredentialsError(AppError):
+    status_code = HTTPStatus.UNAUTHORIZED
+    code = "invalid_credentials"
+    message = "The email or password is not correct."
+
+
+class CsrfMissingError(AppError):
+    status_code = HTTPStatus.BAD_REQUEST
+    code = "csrf_missing"
+    message = "The X-CSRF-Token header is required for this request."
+
+
+class CsrfInvalidError(AppError):
+    status_code = HTTPStatus.FORBIDDEN
+    code = "csrf_invalid"
+    message = "The X-CSRF-Token header does not match this session."
+
+
+class ForbiddenRoleError(AppError):
+    status_code = HTTPStatus.FORBIDDEN
+    code = "forbidden_role"
+    message = "Your role in this workspace does not allow this action."
+
+
+class EmailTakenError(AppError):
+    status_code = HTTPStatus.CONFLICT
+    code = "email_taken"
+    message = "An account with this email already exists."
+
+
+class TooManyAttemptsError(AppError):
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+    code = "too_many_attempts"
+    message = "Too many failed sign-in attempts. Try again later."
+
+
+class EncryptionUnavailableError(AppError):
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+    code = "encryption_unavailable"
+    message = "Encryption is not configured (APP_ENCRYPTION_KEY)."
+
+
 # Default codes for framework-raised HTTP errors (routing, method, size).
 _HTTP_CODES: dict[int, str] = {
     400: "bad_request",

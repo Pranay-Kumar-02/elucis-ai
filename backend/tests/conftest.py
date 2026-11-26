@@ -8,9 +8,13 @@ as skipped with the reason, never silently passed.
 
 from __future__ import annotations
 
+import base64
+import ipaddress
 import os
+import secrets
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import Any
 
 import pytest
 from alembic import command
@@ -19,10 +23,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.pool import NullPool
 
+from elucis.api.auth import current_principal
 from elucis.core.config import BACKEND_ROOT, REPO_ROOT, Settings, get_settings
 from elucis.core.logging import redact_text
 from elucis.db.engine import dispose_engines, normalise_url
 from elucis.main import create_app
+from elucis.modules.identity.context import Principal
 
 UNREACHABLE_OLLAMA = "http://127.0.0.1:9"  # discard port: connection refused immediately
 
@@ -78,9 +84,21 @@ def settings() -> Settings:
     return make_settings()
 
 
+SIGNED_IN = Principal(
+    user_id=uuid.UUID(int=1), session_id=uuid.UUID(int=2), session_token="unit-test", ip=None
+)
+
+
 @pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(settings), raise_server_exceptions=False) as c:
+    """An app without a database, for unit tests of routes that are not about sign-in.
+
+    Sign-in is replaced by a fixed principal. Real sessions, CSRF and roles are tested
+    against the database in ``test_auth_api.py`` and ``test_workspaces_api.py``.
+    """
+    app = create_app(settings)
+    app.dependency_overrides[current_principal] = lambda: SIGNED_IN
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
@@ -184,3 +202,71 @@ def worker_engine(migrated_schema: str) -> Iterator[Engine]:
     engine = _role_engine(TEST_DATABASE_WORKER_URL, migrated_schema, "TEST_DATABASE_WORKER_URL")
     yield engine
     engine.dispose()
+
+
+# ---------------------------------------------------------------- the API on the real schema
+TEST_ENCRYPTION_KEY = base64.urlsafe_b64encode(os.urandom(32)).decode()
+
+
+@pytest.fixture(scope="session")
+def api_settings(migrated_schema: str) -> Settings:
+    """Settings for an app that runs as app_api on the migrated test schema."""
+    if not TEST_DATABASE_API_URL:
+        pytest.skip("TEST_DATABASE_API_URL is not set (see .env.example)")
+    return make_settings(
+        database_url=schema_url(TEST_DATABASE_API_URL, migrated_schema),
+        session_secret=secrets.token_urlsafe(48),
+        app_encryption_key=TEST_ENCRYPTION_KEY,
+    )
+
+
+TEST_PASSWORD = "correct horse battery"  # 21 characters, not on the common list
+
+
+class ApiClient:
+    """A browser: its own cookie jar and IP address, and the CSRF token from sign-in."""
+
+    def __init__(self, client: TestClient) -> None:
+        self.http = client
+        self.csrf: str | None = None
+
+    def call(self, method: str, path: str, **kwargs: object) -> Any:
+        headers = dict(kwargs.pop("headers", None) or {})  # type: ignore[call-overload]
+        if self.csrf and method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+            headers.setdefault("X-CSRF-Token", self.csrf)
+        return self.http.request(method, f"/api/v1{path}", headers=headers, **kwargs)
+
+    def sign_up(self, email: str | None = None, password: str = TEST_PASSWORD) -> str:
+        email = email or f"{uuid.uuid4().hex[:12]}@example.test"
+        registered = self.call(
+            "POST", "/auth/register", json={"email": email, "password": password}
+        )
+        assert registered.status_code == 201, registered.text
+        self.sign_in(email, password)
+        return email
+
+    def sign_in(self, email: str, password: str = TEST_PASSWORD) -> Any:
+        response = self.call("POST", "/auth/login", json={"email": email, "password": password})
+        if response.status_code == 200:
+            self.csrf = response.json()["csrf_token"]
+        return response
+
+
+@pytest.fixture
+def browser(api_settings: Settings) -> Iterator[Callable[[], ApiClient]]:
+    """Factory for independent browsers against one app instance."""
+    app = create_app(api_settings)
+    opened: list[TestClient] = []
+
+    def open_browser() -> ApiClient:
+        # A fresh address in the IPv6 documentation range (2001:db8::/32) per browser, so the
+        # per-IP sign-in limit of one test never affects another.
+        ip = str(ipaddress.IPv6Address((0x20010DB8 << 96) | secrets.randbits(96)))
+        client = TestClient(app, raise_server_exceptions=False, client=(ip, 50000))
+        client.__enter__()
+        opened.append(client)
+        return ApiClient(client)
+
+    yield open_browser
+    for client in opened:
+        client.__exit__(None, None, None)

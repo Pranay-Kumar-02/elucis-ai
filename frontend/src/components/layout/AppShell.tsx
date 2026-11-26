@@ -7,8 +7,10 @@ import { footerNav, mainNav, UNAVAILABLE_HINT, type NavItem } from "@/components
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { product } from "@/config/product";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/features/auth/UserMenu";
 import { AiRuntimeBanner } from "@/features/system/AiRuntimeBanner";
 import { StatusIndicator } from "@/features/system/StatusIndicator";
+import { WorkspaceSwitcher } from "@/features/workspaces/WorkspaceSwitcher";
 import { cn } from "@/lib/utils";
 
 export interface RouteHandle {
@@ -131,9 +133,11 @@ export function AppShell() {
           </Button>
           {/* Pages carry their own heading; the bar repeats it only on small screens. */}
           <p className="text-[15px] font-medium md:hidden">{title}</p>
+          <WorkspaceSwitcher />
           <div className="ml-auto flex items-center gap-1">
             <StatusIndicator />
             <ThemeToggle />
+            <UserMenu />
           </div>
         </header>
         <AiRuntimeBanner />
