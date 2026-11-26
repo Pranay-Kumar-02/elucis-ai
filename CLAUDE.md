@@ -57,7 +57,7 @@ Implemented and verified (195 backend tests, 25 frontend tests, build):
 
 Not built yet: the 54 D07/D08 tables (migration 0002), authentication and workspaces, API-14/API-15 and the ingest job, cleaning/PII/duplicates (SVC-05 onwards), all AI calls CP-01 to CP-10, the other production screens. "Start import" stays disabled until the database exists.
 
-This laptop: PostgreSQL not set up yet (`30-setup-database.ps1`); Ollama 0.40.4 installed, `qwen3-embedding:0.6b` pulled, `qwen3:4b` not pulled (`40-setup-ollama.ps1`); Node 22.23.5 (IMP-05 closed).
+This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-db.ps1 start`), databases `elucis_dev` and `elucis_test`, `.env` created; Ollama 0.40.4 installed, `qwen3-embedding:0.6b` pulled, `qwen3:4b` not pulled (`40-setup-ollama.ps1`); Node 22.23.5 (IMP-05 closed).
 
 ## Next tasks, in order
 

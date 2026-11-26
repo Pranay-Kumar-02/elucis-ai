@@ -12,7 +12,7 @@
   .setup-reports\run-local.json, opens the project in VS Code and the app in your browser.
 
   Known limits of this run (shown honestly in the app):
-    * No PostgreSQL yet and no .env -> database checks report "not configured".
+    * Without .env or a running database (dev-db.ps1 start), database checks report "not configured".
     * qwen3:4b is not pulled yet -> model runtime reports "model not pulled".
     * pnpm enforces the Node.js minimum (22.22.0, IMP-05); an older Node stops the install.
 

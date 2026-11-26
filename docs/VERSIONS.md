@@ -60,4 +60,4 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 | Environment | What was verified | Result |
 |---|---|---|
 | Build environment (Linux, Python 3.12.3, Node 22.23.5, PostgreSQL 18.7 + pgvector 0.8.7 built from the official source tags) | Backend lint, type check, 195 tests including real-database and job-queue tests; frontend type check, lint, format, 25 tests, production build; API and web app run together | All passed (24 Nov 2026) |
-| Team laptop (Windows 11 26H2, i7-13700HX, RTX 4060 8 GB, 13.7 GB RAM) | Setup scripts 10–90 | Recorded in `.setup-reports\` when the scripts run |
+| Team laptop (Windows 11 26H2, i7-13700HX, RTX 4060 8 GB, 13.7 GB RAM; WSL Ubuntu 24.04.1; Node 22.23.5) | Setup scripts 20 and 30: PostgreSQL 18.7 (`18.7-1.pgdg24.04+5`) and pgvector 0.8.7 (`0.8.7-1.pgdg24.04+2`) from PGDG; `elucis-db-check` 5 of 5; 195 backend tests (0 skipped), 25 frontend tests, production build; `/api/v1/health/database` 200 | Passed (26 Nov 2026). Machine details in `.setup-reports\` |
