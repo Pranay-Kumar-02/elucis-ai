@@ -2,7 +2,19 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { healthyResponse, json, mockFetch, renderSignedIn, requestPath } from "@/test/utils";
+import {
+  healthyResponse,
+  json,
+  jsonBody,
+  mockFetch,
+  renderSignedIn,
+  requestPath,
+  workspaceId,
+} from "@/test/utils";
+
+const FILES = `/api/v1/workspaces/${workspaceId}/files`;
+const IMPORTS = `/api/v1/workspaces/${workspaceId}/imports`;
+const noImports = () => json({ items: [], next_cursor: null });
 
 const adapters = [
   {
@@ -175,6 +187,8 @@ describe("imports page", () => {
     source_type: "review",
     required_fields: ["text"],
     suggested_mapping: { text: "review", source_record_id: "id" },
+    id: "file-1",
+    duplicate_of_file: null,
   };
   const report = {
     file: { ...preview },
@@ -228,14 +242,32 @@ describe("imports page", () => {
     const fetchMock = mockFetch({
       "/api/v1/health": () => json(noDatabase, 503),
       "/api/v1/dev/sources/adapters": () => json(adapters),
-      "/api/v1/dev/sources/preview": () => json(preview),
-      "/api/v1/dev/sources/validate": () => json(report),
+      [FILES]: () => json(preview),
+      [`${FILES}/file-1/check`]: () => json(report),
+      [IMPORTS]: (_path, init) =>
+        init?.method === "POST"
+          ? json({ job_id: "job-1", resource_id: "import-1", status: "queued" }, 202)
+          : noImports(),
+      [`${IMPORTS}/import-1`]: () =>
+        json({
+          id: "import-1",
+          source_type: "review",
+          status: "queued",
+          original_filename: "reviews.csv",
+          source_file_id: "file-1",
+          submitted_by: "u",
+          created_at: "2026-11-27T09:00:00Z",
+          started_at: null,
+          finished_at: null,
+          job_id: "job-1",
+          progress: null,
+          error: null,
+          report: null,
+        }),
     });
     await renderSignedIn("/imports");
     expect(await screen.findByText("Zendesk tickets")).toBeInTheDocument();
-    expect(
-      await screen.findByText("Importing starts once the database is connected"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No imports yet")).toBeInTheDocument();
 
     await userEvent.upload(
       screen.getByLabelText(/choose a file/i),
@@ -257,25 +289,31 @@ describe("imports page", () => {
     expect(screen.getByText("Ready to import")).toBeInTheDocument();
     expect(screen.getByText("Empty feedback text")).toBeInTheDocument();
     expect(screen.getByText("Text is empty.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start import" })).toBeDisabled();
+    const mapped = { text: "review", source_record_id: "id", customer_id: "user" };
+    const check = fetchMock.mock.calls.find(([u]) => requestPath(u).endsWith("/check"));
+    expect(jsonBody(check?.[1])).toEqual({ source_type: "review", column_mapping: mapped });
 
-    const call = fetchMock.mock.calls.find(([u]) =>
-      requestPath(u).endsWith("/dev/sources/validate"),
+    // The file is stored: starting the import sends its ID, the mapping and a key, then
+    // opens the import's report page.
+    await userEvent.click(screen.getByRole("button", { name: "Start import" }));
+    expect(await screen.findByText("Waiting for the worker to start…")).toBeInTheDocument();
+    const post = fetchMock.mock.calls.find(
+      ([u, init]) => requestPath(u) === IMPORTS && init?.method === "POST",
     );
-    const body = call?.[1]?.body as FormData;
-    expect(body.get("source_type")).toBe("review");
-    expect(JSON.parse(body.get("mapping") as string)).toEqual({
-      text: "review",
-      source_record_id: "id",
-      customer_id: "user",
+    expect(jsonBody(post?.[1])).toEqual({
+      source_file_id: "file-1",
+      source_type: "review",
+      column_mapping: mapped,
     });
+    expect(new Headers(post?.[1]?.headers).get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("blocks checking until required fields are matched", async () => {
     mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
-      "/api/v1/dev/sources/preview": () => json({ ...preview, suggested_mapping: {} }),
+      [IMPORTS]: noImports,
+      [FILES]: () => json({ ...preview, suggested_mapping: {} }),
     });
     await renderSignedIn("/imports");
     await userEvent.upload(screen.getByLabelText(/choose a file/i), new File(["x"], "r.csv"));
@@ -289,7 +327,8 @@ describe("imports page", () => {
     const fetchMock = mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
-      "/api/v1/dev/sources/preview": () =>
+      [IMPORTS]: noImports,
+      [FILES]: () =>
         json({
           ...preview,
           input: "pasted_text",
@@ -310,9 +349,7 @@ describe("imports page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Preview text" }));
     expect(await screen.findByText("Pasted text")).toBeInTheDocument();
     expect(screen.getByText(/Text is split automatically/)).toBeInTheDocument();
-    const call = fetchMock.mock.calls.find(([u]) =>
-      requestPath(u).endsWith("/dev/sources/preview"),
-    );
+    const call = fetchMock.mock.calls.find(([u]) => requestPath(u) === FILES);
     expect((call?.[1]?.body as FormData).get("pasted_text")).toBe("Export is slow");
   });
 
@@ -320,7 +357,8 @@ describe("imports page", () => {
     mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
-      "/api/v1/dev/sources/preview": () =>
+      [IMPORTS]: noImports,
+      [FILES]: () =>
         json(
           {
             error: {
@@ -348,6 +386,7 @@ describe("imports page", () => {
     const fetchMock = mockFetch({
       "/api/v1/health": () => json(healthyResponse),
       "/api/v1/dev/sources/adapters": () => json(adapters),
+      [IMPORTS]: noImports,
     });
     await renderSignedIn("/imports");
     const big = new File(["x"], "big.csv", { type: "text/csv" });
@@ -360,6 +399,6 @@ describe("imports page", () => {
       applyAccept: false,
     });
     expect(await screen.findByText(/isn't a CSV, JSON or text file/)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([u]) => requestPath(u).endsWith("/preview"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => requestPath(u) === FILES)).toBe(false);
   });
 });

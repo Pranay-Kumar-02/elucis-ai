@@ -1,6 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -35,10 +35,11 @@ function Breakdown({ title, counts }: { title: string; counts: Record<string, nu
 /** Step 4: the result of applying the mapping and validation rules to every row. */
 export function ValidationReport({
   report,
-  databaseReady,
+  action,
 }: {
   report: ValidationReportOut;
-  databaseReady: boolean;
+  /** The "Start import" control, owned by the page (it knows the file and the role). */
+  action?: ReactNode;
 }) {
   const { summary } = report;
   const isMetrics = report.source_type === "metrics";
@@ -55,16 +56,7 @@ export function ValidationReport({
             import rules.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <Button disabled title="Importing needs the database">
-            Start import
-          </Button>
-          {!databaseReady && (
-            <span className="text-[12px] text-muted-foreground">
-              Available once the database is connected
-            </span>
-          )}
-        </div>
+        {action && <div className="flex flex-col items-end gap-1">{action}</div>}
       </div>
 
       <div className="space-y-6 px-6 py-5">

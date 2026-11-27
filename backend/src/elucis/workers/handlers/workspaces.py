@@ -10,17 +10,20 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import Path
 
 from sqlalchemy import delete, select
 
 from elucis.db.models import Workspace
 from elucis.modules.audit.recorder import record
+from elucis.modules.imports.storage import remove_workspace_files
 from elucis.workers.runtime import JobContext
 
 logger = logging.getLogger(__name__)
 
 
-def delete_workspace(ctx: JobContext) -> str:
+def delete_workspace(ctx: JobContext, upload_dir: Path | None = None) -> str:
+    """``upload_dir``: also remove the workspace's uploaded files, once the rows are gone."""
     workspace_id = ctx.job.workspace_id
     requested_by = uuid.UUID(str(ctx.job.payload["requested_by"]))
     with ctx.step() as (db, _queue):
@@ -29,6 +32,8 @@ def delete_workspace(ctx: JobContext) -> str:
         ).scalar_one_or_none()
         if name is None:
             logger.info("workspace already deleted", extra={"workspace_id": str(workspace_id)})
+            if upload_dir is not None:
+                remove_workspace_files(upload_dir, workspace_id)
             return "succeeded"
         db.execute(delete(Workspace).where(Workspace.id == workspace_id))
         record(
@@ -40,5 +45,7 @@ def delete_workspace(ctx: JobContext) -> str:
             target_id=workspace_id,
             details={"workspace_name": name},
         )
+    if upload_dir is not None:  # after the commit: a failed delete never loses files
+        remove_workspace_files(upload_dir, workspace_id)
     logger.info("workspace deleted", extra={"workspace_id": str(workspace_id)})
     return "succeeded"

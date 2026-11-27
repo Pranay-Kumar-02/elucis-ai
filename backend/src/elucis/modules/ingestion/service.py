@@ -148,6 +148,20 @@ def _open_for_rows(
     return adapter
 
 
+def open_for_rows(
+    src: SourceInput, source_type: SourceType, mapping: ColumnMapping | None
+) -> FileAdapter:
+    """An adapter ready for row validation, or ``ValidationFailedError`` when the mapping or
+    the record count would stop an import (used by API-15 and the ingest job)."""
+    return _open_for_rows(src, source_type, mapping)
+
+
+def stored_source(data: bytes, filename: str, sha256: str) -> SourceInput:
+    """A source read back from disk; pasted text keeps its fixed file name."""
+    kind: Literal["file", "pasted_text"] = "pasted_text" if filename == PASTED_FILENAME else "file"
+    return SourceInput(kind, data, filename, sha256)
+
+
 def _record_out(record: NormalizedRecord) -> NormalizedRecordOut:
     data = asdict(record)
     data["flags"] = list(record.flags)

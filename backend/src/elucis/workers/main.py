@@ -1,7 +1,7 @@
 """Worker process entry point (``elucis-worker`` / ``python -m elucis.workers.main``).
 
-Job handlers are registered here as each module is implemented (``delete_workspace`` so
-far; ingest, analysis, generate_document and the others follow). Jobs without a handler
+Job handlers are registered here as each module is implemented (``delete_workspace`` and
+``ingest`` so far; analysis, generate_document and the others follow). Jobs without a handler
 fail cleanly; the worker never invents work.
 """
 
@@ -11,16 +11,22 @@ import logging
 import sys
 from functools import partial
 
-from elucis.core.config import get_settings
+from elucis.core.config import Settings, get_settings
 from elucis.core.logging import configure_logging
 from elucis.db.engine import get_engine
+from elucis.modules.imports.pipeline import run_ingest
 from elucis.workers.handlers.workspaces import delete_workspace
 from elucis.workers.maintenance import MAINTENANCE_INTERVAL_S, purge_expired
 from elucis.workers.runtime import Handler, Worker
 
 logger = logging.getLogger("elucis.worker")
 
-HANDLERS: dict[str, Handler] = {"delete_workspace": delete_workspace}
+
+def build_handlers(settings: Settings) -> dict[str, Handler]:
+    return {
+        "delete_workspace": partial(delete_workspace, upload_dir=settings.upload_dir),
+        "ingest": partial(run_ingest, settings=settings),
+    }
 
 
 def main() -> int:
@@ -28,7 +34,7 @@ def main() -> int:
     configure_logging(settings.log_level, settings.log_format.value)
     worker = Worker(
         get_engine("worker", settings),
-        HANDLERS,
+        build_handlers(settings),
         poll_interval_s=settings.worker_poll_interval_s,
         heartbeat_interval_s=settings.worker_heartbeat_interval_s,
         maintenance=partial(purge_expired, session_idle_minutes=settings.session_idle_minutes),

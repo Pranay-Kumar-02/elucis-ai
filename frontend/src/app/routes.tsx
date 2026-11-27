@@ -7,6 +7,7 @@ import { RegisterPage } from "@/features/auth/RegisterPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { SignInPage } from "@/features/auth/SignInPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { ImportDetailPage } from "@/features/imports/ImportDetailPage";
 import { ImportsPage } from "@/features/sources/ImportsPage";
 import { SystemStatusPage } from "@/features/system/SystemStatusPage";
 import { MembersPage } from "@/features/workspaces/MembersPage";
@@ -31,6 +32,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <DashboardPage />, handle: handle("Dashboard") },
       { path: "imports", element: <ImportsPage />, handle: handle("Imports") },
+      { path: "imports/:importId", element: <ImportDetailPage />, handle: handle("Import") },
       { path: "workspaces", element: <WorkspacesPage />, handle: handle("Workspaces") },
       { path: "settings/general", element: <WorkspaceSettingsPage />, handle: handle("Settings") },
       { path: "settings/members", element: <MembersPage />, handle: handle("Members") },

@@ -202,3 +202,59 @@ export interface JobRef {
   resource_id: string;
   status: "queued";
 }
+
+// ---- stored files and imports (API-14 to API-18)
+export interface SourceFileOut extends FilePreviewOut {
+  id: string;
+  duplicate_of_file: { id: string; original_filename: string; uploaded_at: string } | null;
+}
+
+export type ImportStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "completed_with_errors"
+  | "failed"
+  | "cancelled";
+
+/** Reconciliation snapshot at completion (D06 §10.1). */
+export interface ImportReport {
+  received: number;
+  imported: number;
+  rejected: number;
+  duplicates: number;
+  filtered: Record<string, number>;
+  failed: number;
+  reconciled: boolean;
+  flags: Record<string, number>;
+  pii_masked: Record<string, number>;
+  date_range: { from: string | null; to: string | null };
+  not_checked: string[];
+  error?: string;
+}
+
+export interface ImportOut {
+  id: string;
+  source_type: SourceType;
+  status: ImportStatus;
+  original_filename: string | null;
+  source_file_id: string | null;
+  submitted_by: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  job_id: string | null;
+  progress: { processed: number; total: number } | null;
+  error: string | null;
+  report: ImportReport | null;
+}
+
+export interface StoredRowErrorOut {
+  id: string;
+  row_number: number;
+  kind: "rejected" | "failed";
+  stage: string;
+  field: string | null;
+  code: string;
+  message: string;
+}

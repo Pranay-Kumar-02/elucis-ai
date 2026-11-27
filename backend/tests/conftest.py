@@ -209,14 +209,16 @@ TEST_ENCRYPTION_KEY = base64.urlsafe_b64encode(os.urandom(32)).decode()
 
 
 @pytest.fixture(scope="session")
-def api_settings(migrated_schema: str) -> Settings:
-    """Settings for an app that runs as app_api on the migrated test schema."""
+def api_settings(migrated_schema: str, tmp_path_factory: pytest.TempPathFactory) -> Settings:
+    """Settings for an app that runs as app_api on the migrated test schema. Uploads go to a
+    temporary directory, never to the project's ``data/``."""
     if not TEST_DATABASE_API_URL:
         pytest.skip("TEST_DATABASE_API_URL is not set (see .env.example)")
     return make_settings(
         database_url=schema_url(TEST_DATABASE_API_URL, migrated_schema),
         session_secret=secrets.token_urlsafe(48),
         app_encryption_key=TEST_ENCRYPTION_KEY,
+        upload_dir=tmp_path_factory.mktemp("uploads"),
     )
 
 

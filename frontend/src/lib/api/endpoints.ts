@@ -4,14 +4,18 @@ import type {
   DatabaseHealthOut,
   FilePreviewOut,
   HealthOut,
+  ImportOut,
+  ImportStatus,
   JobRef,
   MemberOut,
   MeOut,
   ModelRuntimeHealthOut,
   Page,
   Role,
+  SourceFileOut,
   SourceInfoOut,
   SourceType,
+  StoredRowErrorOut,
   UserOut,
   ValidationReportOut,
   WorkspaceOut,
@@ -100,4 +104,50 @@ export const api = {
     }),
   removeMember: (id: string, userId: string) =>
     apiRequest<null>(`/workspaces/${id}/members/${userId}`, { method: "DELETE" }),
+
+  // ---- stored files and imports (API-14 to API-18)
+  uploadFile: (ws: string, input: SourceInput, sourceType: SourceType) =>
+    apiRequest<SourceFileOut>(`/workspaces/${ws}/files`, {
+      method: "POST",
+      body: sourceForm(input, sourceType),
+      timeoutMs: 120_000,
+    }),
+  checkFile: (ws: string, fileId: string, sourceType: SourceType, mapping: ColumnMapping) =>
+    apiRequest<ValidationReportOut>(`/workspaces/${ws}/files/${fileId}/check`, {
+      method: "POST",
+      body: { source_type: sourceType, column_mapping: mapping },
+      timeoutMs: 120_000,
+    }),
+  startImport: (
+    ws: string,
+    body: { source_file_id: string; source_type: SourceType; column_mapping: ColumnMapping },
+    idempotencyKey: string,
+  ) =>
+    apiRequest<JobRef>(`/workspaces/${ws}/imports`, {
+      method: "POST",
+      body,
+      headers: { "Idempotency-Key": idempotencyKey },
+      timeoutMs: 120_000,
+    }),
+  imports: (ws: string, signal?: AbortSignal, status?: ImportStatus) =>
+    apiRequest<Page<ImportOut>>(
+      `/workspaces/${ws}/imports?limit=50${status ? `&status=${status}` : ""}`,
+      { ...(signal && { signal }) },
+    ),
+  importDetail: (ws: string, id: string, signal?: AbortSignal) =>
+    apiRequest<ImportOut>(`/workspaces/${ws}/imports/${id}`, { ...(signal && { signal }) }),
+  importErrors: (
+    ws: string,
+    id: string,
+    filters: { kind?: string; stage?: string },
+    signal?: AbortSignal,
+  ) => {
+    const query = new URLSearchParams({ limit: "200" });
+    if (filters.kind) query.set("kind", filters.kind);
+    if (filters.stage) query.set("stage", filters.stage);
+    return apiRequest<Page<StoredRowErrorOut>>(
+      `/workspaces/${ws}/imports/${id}/errors?${query.toString()}`,
+      { ...(signal && { signal }) },
+    );
+  },
 };
