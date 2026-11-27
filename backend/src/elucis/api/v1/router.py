@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from elucis.api.auth import current_principal
 from elucis.api.v1 import health
 from elucis.core.config import Settings
+from elucis.modules.analysis import router as analysis
 from elucis.modules.identity import router as identity
 from elucis.modules.imports import router as imports
 from elucis.modules.ingestion import router as ingestion_dev
@@ -22,6 +23,7 @@ def build_router(settings: Settings) -> APIRouter:
     router.include_router(identity.auth)
     router.include_router(identity.workspaces)
     router.include_router(imports.router)
+    router.include_router(analysis.router)
     if settings.enable_dev_endpoints and not settings.is_production:
         # Development-only, but still behind sign-in (FR-AUTH-02, IMP-28).
         router.include_router(ingestion_dev.router, dependencies=[Depends(current_principal)])

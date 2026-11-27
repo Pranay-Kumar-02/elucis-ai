@@ -232,7 +232,7 @@ def test_interrupted_ingest_resumes_without_losing_or_duplicating_rows(
 
     def crash_on_second_batch(*args: Any, **kwargs: Any) -> None:
         # Only this import's second batch (other tests' queued jobs may run here too).
-        if str(args[1]) == import_id and args[4].position == pipeline.BATCH_SIZE:
+        if str(args[1].import_job_id) == import_id and args[4].position == pipeline.BATCH_SIZE:
             raise RuntimeError("simulated worker crash")
         real_batch(*args, **kwargs)
 
@@ -284,9 +284,9 @@ def test_a_reconciliation_mismatch_fails_the_import(
     ctx = JobContext(job, worker_engine, "w-mismatch")
     started = pipeline._start(ctx, api_settings, uuid.UUID(ref["resource_id"]))
     assert started is not None
-    adapter, validator = started
+    adapter, validator, batch_ctx = started
     state = IngestState()
-    pipeline._ingest_batch(ctx, uuid.UUID(ref["resource_id"]), adapter, validator, state, total=3)
+    pipeline._ingest_batch(ctx, batch_ctx, adapter, validator, state, total=3)
     # Pretend the file had one more row than was accounted for.
     status = pipeline._finish(ctx, uuid.UUID(ref["resource_id"]), received=4, flags=state.flags)
     assert status == "failed"
@@ -294,3 +294,97 @@ def test_a_reconciliation_mismatch_fails_the_import(
     assert detail["status"] == "failed"
     assert detail["report"]["reconciled"] is False
     assert detail["error"].startswith("Reconciliation error")
+
+
+# ---------------------------------------------------------------- preprocessing in the job
+PREP_CSV = (
+    "review,date,stars,user\n"
+    "Checkout fails. Email me at riya@example.com,2026-10-02,1,u1\n"
+    "checkout FAILS!! email me at other@example.com,2026-10-02,2,u1\n"  # same customer copy
+    "Checkout fails. Email me at riya@example.com,2026-10-02,1,u2\n"  # another customer
+    "ok,2026-10-03,3,u3\n"  # noise
+    "<b>Love</b> the export,2026-10-04,8,u4\n"
+)
+
+
+def _records(owner_engine: Engine, ws: str, import_id: str) -> list[Any]:
+    with owner_engine.begin() as conn:
+        bind(conn, uuid.UUID(ws))
+        return list(
+            conn.execute(
+                text(
+                    "SELECT row_number, raw_text, processed_text, analysable, stage,"
+                    " exclusion_reason, duplicate_of, customer_id, rating, pii_counts, id"
+                    " FROM feedback_records WHERE import_job_id = :i ORDER BY row_number"
+                ),
+                {"i": import_id},
+            ).all()
+        )
+
+
+def test_ingest_masks_standardises_and_marks_duplicates_and_noise(
+    team: dict[str, Any], worker_engine: Engine, owner_engine: Engine, api_settings: Settings
+) -> None:
+    owner, ws = team["owner"], team["ws"]
+    file_id = _upload(owner, ws, PREP_CSV.encode()).json()["id"]
+    import_id = _start(owner, ws, file_id).json()["resource_id"]
+    _run_worker(worker_engine, api_settings)
+
+    rows = {r.row_number: r for r in _records(owner_engine, ws, import_id)}
+    first = rows[1]
+    assert first.raw_text.endswith("riya@example.com")  # raw text kept (DR-15)
+    assert first.processed_text == "Checkout fails. Email me at [EMAIL]"  # masked (DR-29)
+    assert first.pii_counts == {"EMAIL": 1}
+    assert (first.analysable, first.stage, first.rating) == (True, "prepared", 1)
+    # Same customer, same masked text up to case and punctuation: a duplicate (DR-16, DR-18).
+    assert rows[2].exclusion_reason == "duplicate"
+    assert rows[2].duplicate_of == first.id
+    assert rows[2].analysable is False
+    # Another customer saying the same thing is corroboration (CR-16).
+    assert rows[3].analysable is True
+    assert rows[3].customer_id != first.customer_id
+    assert rows[4].exclusion_reason == "noise"
+    assert rows[4].processed_text == "ok"  # still masked and viewable
+    assert rows[5].processed_text == "Love the export"  # markup removed (DR-11)
+    assert rows[5].rating == 4  # 8 on the import's 10-point scale (A-24)
+
+    report = owner.call("GET", f"/workspaces/{ws}/imports/{import_id}").json()["report"]
+    assert (report["imported"], report["duplicates"], report["filtered"]["noise"]) == (3, 1, 1)
+    assert report["pii_masked"] == {"EMAIL": 3}
+    assert report["reconciled"] is True
+    with owner_engine.begin() as conn:
+        bind(conn, uuid.UUID(ws))
+        customers = conn.execute(text("SELECT count(*) FROM customers")).scalar_one()
+    assert customers == 4  # u1..u4, stored only as keyed hashes (DR-23)
+
+
+def test_a_masking_failure_fails_closed(
+    team: dict[str, Any],
+    worker_engine: Engine,
+    owner_engine: Engine,
+    api_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, ws = team["owner"], team["ws"]
+    file_id = _upload(owner, ws, b"review\nMy card is 4111 1111 1111 1111\n").json()["id"]
+    body = {
+        "source_file_id": file_id,
+        "source_type": "review",
+        "column_mapping": {"text": "review"},
+    }
+    import_id = owner.call("POST", f"/workspaces/{ws}/imports", json=body).json()["resource_id"]
+
+    def broken(_text: str) -> Any:
+        raise RuntimeError("masking engine unavailable")
+
+    real = pipeline.BatchContext
+    monkeypatch.setattr(pipeline, "BatchContext", partial(real, mask=broken))
+    _run_worker(worker_engine, api_settings)
+
+    (row,) = _records(owner_engine, ws, import_id)
+    assert row.exclusion_reason == "pii_failed"
+    assert row.processed_text is None  # unmasked text is never stored as processed text
+    assert row.analysable is False
+    report = owner.call("GET", f"/workspaces/{ws}/imports/{import_id}").json()["report"]
+    assert report["filtered"]["pii_failed"] == 1
+    assert report["reconciled"] is True

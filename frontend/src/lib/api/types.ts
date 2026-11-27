@@ -210,12 +210,7 @@ export interface SourceFileOut extends FilePreviewOut {
 }
 
 export type ImportStatus =
-  | "queued"
-  | "processing"
-  | "completed"
-  | "completed_with_errors"
-  | "failed"
-  | "cancelled";
+  "queued" | "processing" | "completed" | "completed_with_errors" | "failed" | "cancelled";
 
 /** Reconciliation snapshot at completion (D06 §10.1). */
 export interface ImportReport {
@@ -257,4 +252,40 @@ export interface StoredRowErrorOut {
   field: string | null;
   code: string;
   message: string;
+}
+
+// ---- analysis runs (API-31, API-32)
+export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface RunReport {
+  eligible: number;
+  embedded: number;
+  embedding_failed: number;
+  classified: number;
+  unclassified: number;
+  steps: string[];
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface RunOut {
+  id: string;
+  status: RunStatus;
+  is_current: boolean;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  job_id: string | null;
+  step: string | null;
+  progress: Record<string, unknown> | null;
+  config: Record<string, unknown>;
+  report: RunReport | null;
+  error: string | null;
+}
+
+export interface AnalysisStatusOut {
+  analysable_records: number;
+  records_since_last_run: number;
+  current_run: RunOut | null;
+  latest_run: RunOut | null;
 }

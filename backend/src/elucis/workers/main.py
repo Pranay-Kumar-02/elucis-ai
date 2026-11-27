@@ -1,7 +1,7 @@
 """Worker process entry point (``elucis-worker`` / ``python -m elucis.workers.main``).
 
 Job handlers are registered here as each module is implemented (``delete_workspace`` and
-``ingest`` so far; analysis, generate_document and the others follow). Jobs without a handler
+``ingest`` and ``analysis`` so far; generate_document and the others follow). Jobs without a handler
 fail cleanly; the worker never invents work.
 """
 
@@ -14,6 +14,7 @@ from functools import partial
 from elucis.core.config import Settings, get_settings
 from elucis.core.logging import configure_logging
 from elucis.db.engine import get_engine
+from elucis.modules.analysis.orchestrator import run_analysis
 from elucis.modules.imports.pipeline import run_ingest
 from elucis.workers.handlers.workspaces import delete_workspace
 from elucis.workers.maintenance import MAINTENANCE_INTERVAL_S, purge_expired
@@ -26,6 +27,7 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
     return {
         "delete_workspace": partial(delete_workspace, upload_dir=settings.upload_dir),
         "ingest": partial(run_ingest, settings=settings),
+        "analysis": partial(run_analysis, settings=settings),
     }
 
 

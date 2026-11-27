@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  AnalysisStatusOut,
   ColumnMapping,
   DatabaseHealthOut,
   FilePreviewOut,
@@ -150,4 +151,15 @@ export const api = {
       { ...(signal && { signal }) },
     );
   },
+
+  // ---- analysis runs (API-31, API-32)
+  analysisStatus: (ws: string, signal?: AbortSignal) =>
+    apiRequest<AnalysisStatusOut>(`/workspaces/${ws}/analysis`, { ...(signal && { signal }) }),
+  startAnalysis: (ws: string, idempotencyKey: string) =>
+    apiRequest<JobRef>(`/workspaces/${ws}/analysis-runs`, {
+      method: "POST",
+      body: {},
+      headers: { "Idempotency-Key": idempotencyKey },
+      timeoutMs: 30_000,
+    }),
 };

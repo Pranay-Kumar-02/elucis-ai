@@ -144,6 +144,18 @@ class EncryptionUnavailableError(AppError):
     message = "Encryption is not configured (APP_ENCRYPTION_KEY)."
 
 
+class RunInProgressError(AppError):
+    status_code = HTTPStatus.CONFLICT
+    code = "run_in_progress"
+    message = "An analysis run is already in progress for this workspace."
+
+
+class NoAnalysableRecordsError(AppError):
+    status_code = HTTPStatus.UNPROCESSABLE_ENTITY
+    code = "no_analysable_records"
+    message = "There are no analysable records yet. Import feedback first."
+
+
 # Default codes for framework-raised HTTP errors (routing, method, size).
 _HTTP_CODES: dict[int, str] = {
     400: "bad_request",

@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { product } from "@/config/product";
+import { AnalysisPanel } from "@/features/analysis/AnalysisPanel";
 import { useHealth } from "@/features/system/queries";
 import { aiPausedReason } from "@/features/system/status";
 import { useActiveWorkspace } from "@/features/workspaces/active";
@@ -108,6 +109,8 @@ export function DashboardPage() {
           </Button>
         </div>
       </section>
+
+      {active && dbReady && <AnalysisPanel membership={active} />}
 
       <section aria-labelledby="setup-heading" className="rounded-xl border bg-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-6 py-4">

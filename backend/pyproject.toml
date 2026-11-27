@@ -25,6 +25,9 @@ dependencies = [
     "argon2-cffi==25.1.0",
     "python-dateutil==4.0.0",
     "cryptography==50.0.2",
+    "presidio-analyzer==2.2.366",
+    "spacy==3.8.18",
+    "en-core-web-sm",
 ]
 
 [dependency-groups]
@@ -55,6 +58,9 @@ required-version = ">=0.9"
 exclude-newer = "2026-11-10T00:00:00Z"
 # Everyone uses a uv-managed CPython 3.12 build, not whatever python.exe is on PATH.
 python-preference = "managed"
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
 
 # ---------------------------------------------------------------- Ruff
 [tool.ruff]

@@ -1,5 +1,7 @@
-"""The ``ingest`` job (SVC-03, D06 §2): read the stored file in batches, store valid rows as
-``feedback_records`` and rejected rows as ``import_row_errors``, then reconcile.
+"""The ``ingest`` job (SVC-03, D06 §2): read the stored file in batches, preprocess valid
+rows (clean, noise, standardise, mask PII, exact duplicates; ``modules.preprocessing``) and
+store them as ``feedback_records``, store rejected rows as ``import_row_errors``, then
+reconcile.
 
 Restartable (DR-39): each batch of 500 rows is one transaction that also saves the cursor,
 so a crash resumes at the last committed batch; inserts are keyed by (import, row, segment),
@@ -8,8 +10,9 @@ so a repeated batch can never store a row twice (FR-ING-07).
 Call chain::
 
     run_ingest(ctx, settings)
-      _start(...)            -> import row 'processing', file bytes, adapter + validator
-      _ingest_batch(...)     -> one transaction per 500 rows (validate, insert, checkpoint)
+      _start(...)            -> import row 'processing', file, adapter + validator, secret
+      _ingest_batch(...)     -> one transaction per 500 rows:
+                                validate -> prepare_batch -> insert -> checkpoint
       _finish(...)           -> counts, reconciliation (DR-40), report, final status
 """
 
@@ -27,10 +30,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from elucis.core.config import Settings
-from elucis.db.models import FeedbackRecord, ImportJob, ImportRowError, SourceFile
+from elucis.db.models import FeedbackRecord, ImportJob, ImportRowError, SourceFile, Workspace
 from elucis.modules.imports.service import load_source
 from elucis.modules.ingestion.adapters.base import ColumnMapping, SourceType
 from elucis.modules.ingestion.adapters.file_adapter import FileAdapter
+from elucis.modules.ingestion.parsing import parse_rating
 from elucis.modules.ingestion.service import open_for_rows
 from elucis.modules.ingestion.validation import (
     MetricObservation,
@@ -38,6 +42,9 @@ from elucis.modules.ingestion.validation import (
     RowError,
     RowValidator,
 )
+from elucis.modules.preprocessing.prepare import BatchContext, prepare_batch
+from elucis.modules.preprocessing.standardise import detect_scale
+from elucis.security import crypto
 from elucis.workers.runtime import JobContext
 
 logger = logging.getLogger(__name__)
@@ -72,11 +79,11 @@ def run_ingest(ctx: JobContext, settings: Settings) -> str:
         started = _start(ctx, settings, import_id)
         if started is None:  # gone, or already finished: nothing to do
             return "succeeded"
-        adapter, validator = started
+        adapter, validator, batch_ctx = started
         state = IngestState.from_cursor(ctx.job.cursor)
         total = adapter.item_count
         while state.position < total:
-            _ingest_batch(ctx, import_id, adapter, validator, state, total=total)
+            _ingest_batch(ctx, batch_ctx, adapter, validator, state, total=total)
         return _finish(ctx, import_id, received=total, flags=state.flags)
     except Exception as exc:
         if ctx.job.attempts >= ctx.job.max_attempts:  # no retry left: say so on the import
@@ -87,7 +94,7 @@ def run_ingest(ctx: JobContext, settings: Settings) -> str:
 # ---------------------------------------------------------------- stages
 def _start(
     ctx: JobContext, settings: Settings, import_id: uuid.UUID
-) -> tuple[FileAdapter, RowValidator] | None:
+) -> tuple[FileAdapter, RowValidator, BatchContext] | None:
     with ctx.step() as (db, _queue):
         imp = _import(db, ctx.job.workspace_id, import_id)
         if imp is None or imp.status in FINAL_STATUSES:
@@ -105,13 +112,36 @@ def _start(
         source_type = SourceType(imp.source_type)
         mapping = ColumnMapping.model_validate(imp.column_mapping)
         src = load_source(settings, file_row)
+        encrypted = db.execute(
+            select(Workspace.customer_key_secret).where(Workspace.id == imp.workspace_id)
+        ).scalar_one()
     adapter = open_for_rows(src, source_type, mapping)
-    return adapter, RowValidator(adapter, source_type)
+    batch_ctx = BatchContext(
+        workspace_id=ctx.job.workspace_id,
+        import_job_id=import_id,
+        customer_secret=crypto.decrypt(settings, bytes(encrypted)),
+        rating_scale=_rating_scale(adapter),
+    )
+    return adapter, RowValidator(adapter, source_type), batch_ctx
+
+
+def _rating_scale(adapter: FileAdapter) -> float | None:
+    """The import's rating scale from its highest plain number (SVC-05, A-24); ratings
+    written with their own scale ("4/5", "80%", stars) do not need it."""
+    column = adapter.mapping.rating if adapter.mapping else None
+    if not column:
+        return None
+    plain = []
+    for raw in adapter.column_values(column):
+        rating = parse_rating(raw) if raw else None
+        if rating is not None and rating.out_of is None:
+            plain.append(rating.value)
+    return detect_scale(plain)
 
 
 def _ingest_batch(
     ctx: JobContext,
-    import_id: uuid.UUID,
+    batch_ctx: BatchContext,
     adapter: FileAdapter,
     validator: RowValidator,
     state: IngestState,
@@ -119,8 +149,8 @@ def _ingest_batch(
     total: int,
 ) -> None:
     stop = min(state.position + BATCH_SIZE, total)
-    ws = ctx.job.workspace_id
-    records: list[dict[str, Any]] = []
+    ws, import_id = ctx.job.workspace_id, batch_ctx.import_job_id
+    valid: list[NormalizedRecord] = []
     errors: list[dict[str, Any]] = []
     flags: Counter[str] = Counter()
     for batch, _cursor in adapter.fetch_range(state.position, stop):
@@ -130,10 +160,12 @@ def _ingest_batch(
                 errors.append(_rejected_row(ws, import_id, result))
             elif isinstance(result, NormalizedRecord):
                 flags.update(result.flags)
-                records.append(_captured_record(ws, import_id, result))
+                valid.append(result)
             elif isinstance(result, MetricObservation):  # refused by API-15; never reached
                 raise TypeError("metric rows cannot be imported as feedback")
     with ctx.step() as (db, queue):
+        records, failures = prepare_batch(db, batch_ctx, valid)
+        errors += failures
         if records:
             db.execute(
                 pg_insert(FeedbackRecord)
@@ -192,23 +224,6 @@ def _rejected_row(ws: uuid.UUID, import_id: uuid.UUID, error: RowError) -> dict[
         "field": error.field,
         "code": error.code,
         "message": error.message,
-    }
-
-
-def _captured_record(ws: uuid.UUID, import_id: uuid.UUID, rec: NormalizedRecord) -> dict[str, Any]:
-    return {
-        "workspace_id": ws,
-        "import_job_id": import_id,
-        "row_number": rec.row_number,
-        "segment_index": rec.segment_index,
-        "source_type": rec.source_type.value,
-        "source_record_id": rec.source_record_id,
-        "raw_text": rec.raw_text,
-        "occurred_at": rec.occurred_at,
-        "occurred_at_missing": rec.occurred_at is None,  # missing or unreadable (DR-08)
-        "rating_raw": rec.rating_raw,
-        "metadata_": rec.metadata,
-        "stage": "captured",
     }
 
 
