@@ -107,6 +107,14 @@ export function AnalysisPanel({ membership }: { membership: MembershipOut }) {
                 </dd>
               </div>
             )}
+            {current.report.requests !== undefined && (
+              <div>
+                <dt className="text-[12px] text-muted-foreground">Request groups</dt>
+                <dd className="tabular text-[22px] font-semibold">
+                  {current.report.requests.toLocaleString()}
+                </dd>
+              </div>
+            )}
             {current.report.unclassified > 0 && (
               <div>
                 <dt className="text-[12px] text-muted-foreground">Not labelled</dt>

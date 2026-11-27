@@ -157,7 +157,9 @@ def test_a_record_that_cannot_be_embedded_is_marked_for_this_run_only(
     run = owner.call("GET", f"/workspaces/{ws}/analysis-runs/{run_id}").json()
     assert run["status"] == "succeeded"
     assert (run["report"]["embedded"], run["report"]["embedding_failed"]) == (2, 1)
-    assert gateway.calls == 3 + 3  # first try + 2 retries, then one call per record
+    # First try + 2 retries, then one call per record; then one more for the request step's
+    # ask ("Please add dark mode").
+    assert gateway.calls == 3 + 3 + 1
     failed = _scalar(
         owner_engine,
         ws,

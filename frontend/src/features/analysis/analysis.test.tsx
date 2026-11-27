@@ -35,6 +35,8 @@ const run = {
     unclassified: 2,
     themes: 7,
     assigned: 101,
+    requests: 5,
+    request_records: 40,
     categories: { bug_report: 60, feature_request: 40, praise: 16 },
     steps: ["embed", "classify", "cluster", "stats", "name"],
   },
@@ -125,6 +127,7 @@ describe("analysis panel (UI-05)", () => {
     expect(screen.getByText("118")).toBeInTheDocument();
     expect(screen.getByText("Could not be read")).toBeInTheDocument();
     expect(screen.getByText("Themes found")).toBeInTheDocument();
+    expect(screen.getByText("Request groups")).toBeInTheDocument();
     expect(screen.getByText("Not labelled")).toBeInTheDocument();
     expect(screen.getByText("Feedback by type")).toBeInTheDocument();
     expect(screen.getByText(/Bug reports/)).toBeInTheDocument();

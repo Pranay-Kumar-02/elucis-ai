@@ -28,10 +28,12 @@ from sqlalchemy import and_, func, select, update
 from elucis.ai.ollama import OllamaClient
 from elucis.core.config import Settings
 from elucis.db.models import (
+    AggregatedRequest,
     AnalysisRun,
     FeedbackRecord,
     RecordClassification,
     RecordEmbedding,
+    RequestMembership,
     Theme,
     ThemeMembership,
     Workspace,
@@ -41,6 +43,7 @@ from elucis.modules.analysis.classify import classify_step
 from elucis.modules.analysis.context import RunContext
 from elucis.modules.analysis.embedding import embed_step
 from elucis.modules.analysis.gateway import ModelGateway
+from elucis.modules.analysis.requests import archive_earlier_requests, requests_step
 from elucis.modules.analysis.themes import (
     archive_earlier_themes,
     cluster_step,
@@ -58,6 +61,7 @@ STEPS: list[tuple[str, Step]] = [
     ("cluster", cluster_step),  # SVC-11
     ("stats", stats_step),  # SVC-10 statistics (before naming, so citations have a row)
     ("name", name_step),  # CP-03
+    ("requests", requests_step),  # SVC-12, CP-04
 ]
 FINAL = frozenset({"succeeded", "failed", "cancelled"})
 
@@ -171,6 +175,21 @@ def run_report(db: Any, ws: uuid.UUID, run_id: uuid.UUID) -> dict[str, Any]:
                 )
             ).scalar_one()
         ),
+        "requests": int(
+            db.execute(
+                select(func.count()).where(
+                    AggregatedRequest.workspace_id == ws, AggregatedRequest.first_run_id == run_id
+                )
+            ).scalar_one()
+        ),
+        "request_records": int(
+            db.execute(
+                select(func.count()).where(
+                    RequestMembership.workspace_id == ws,
+                    RequestMembership.analysis_run_id == run_id,
+                )
+            ).scalar_one()
+        ),
         "categories": {
             str(c): int(n)
             for c, n in db.execute(
@@ -196,6 +215,7 @@ def activate(ctx: JobContext, run_id: uuid.UUID) -> None:
             .values(status="succeeded", report=report, finished_at=func.now())
         )
         archive_earlier_themes(db, ws, run_id)
+        archive_earlier_requests(db, ws, run_id)
         db.execute(
             update(Workspace).where(Workspace.id == ws).values(current_analysis_run_id=run_id)
         )

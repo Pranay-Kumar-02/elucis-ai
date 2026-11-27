@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session
 
 from elucis.ai.ollama import OllamaClient
@@ -17,7 +17,7 @@ from elucis.core.errors import (
     RunInProgressError,
     ValidationFailedError,
 )
-from elucis.db.models import AnalysisRun, FeedbackRecord, Job, Workspace
+from elucis.db.models import AnalysisRun, FeedbackRecord, Job, RecordClassification, Workspace
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL
 from elucis.modules.analysis.config import config_hash, run_config
 from elucis.modules.analysis.schemas import AnalysisStatusOut, RunOut
@@ -179,16 +179,23 @@ def analysis_status(db: Session, ctx: WorkspaceContext) -> AnalysisStatusOut:
     current = _current_id(db, ws)
     runs = list_runs(db, ctx, limit=1)
     current_run = get_run(db, ctx, current) if current else None
-    since = 0
     total = int(db.execute(_analysable(db, ws)).scalar_one())
-    if current_run is not None and current_run.started_at is not None:
+    since = total
+    if current is not None:
+        # Records the current run has no outcome for (not a timestamp comparison, which a
+        # clock correction could break, F-07).
+        rc = RecordClassification
         since = int(
             db.execute(
-                _analysable(db, ws).where(FeedbackRecord.created_at > current_run.started_at)
+                _analysable(db, ws).where(
+                    ~exists().where(
+                        rc.workspace_id == FeedbackRecord.workspace_id,
+                        rc.record_id == FeedbackRecord.id,
+                        rc.analysis_run_id == current,
+                    )
+                )
             ).scalar_one()
         )
-    else:
-        since = total
     return AnalysisStatusOut(
         analysable_records=total,
         records_since_last_run=since,

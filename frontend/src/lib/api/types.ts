@@ -265,6 +265,8 @@ export interface RunReport {
   unclassified: number;
   themes?: number;
   assigned?: number;
+  requests?: number;
+  request_records?: number;
   categories?: Record<string, number>;
   steps: string[];
   error?: string;

@@ -32,7 +32,12 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from elucis.ai.prompts import ISSUE_CATEGORIES
-from elucis.db.models import FeedbackRecord, RecordClassification, ThemeMembership
+from elucis.db.models import (
+    FeedbackRecord,
+    RecordClassification,
+    RequestMembership,
+    ThemeMembership,
+)
 
 TREND_WEEKS = 8
 MIN_RELATIVE_CHANGE = 0.05  # SVC-13
@@ -221,3 +226,10 @@ def theme_stats(
 ) -> dict[uuid.UUID, GroupStats]:
     tm = ThemeMembership
     return group_stats(db, ws, run_id, tm, tm.theme_id, filters=filters)
+
+
+def request_stats(
+    db: Session, ws: uuid.UUID, run_id: uuid.UUID, filters: Filters | None = None
+) -> dict[uuid.UUID, GroupStats]:
+    rm = RequestMembership
+    return group_stats(db, ws, run_id, rm, rm.request_id, filters=filters)

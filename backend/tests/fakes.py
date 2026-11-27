@@ -58,7 +58,7 @@ def label(text: str) -> tuple[str, str]:
 class FakeGateway:
     """``bad``: texts whose embedding fails; ``down``: every call fails as unreachable;
     ``bad_cp02_batches``: CP-02 replies to multi-record batches with wrong keys;
-    ``bad_cp03``: CP-03 always cites an unknown ID."""
+    ``bad_cp03``: CP-03 always cites an unknown ID; ``bad_cp04``: CP-04 never answers validly."""
 
     def __init__(
         self,
@@ -67,9 +67,11 @@ class FakeGateway:
         down: bool = False,
         bad_cp02_batches: bool = False,
         bad_cp03: bool = False,
+        bad_cp04: bool = False,
     ) -> None:
         self.bad, self.down = bad, down
         self.bad_cp02_batches, self.bad_cp03 = bad_cp02_batches, bad_cp03
+        self.bad_cp04 = bad_cp04
         self.calls = 0  # embedding calls
         self.chat_calls: list[str] = []  # schema names, in order
 
@@ -106,6 +108,8 @@ class FakeGateway:
             }
             return Cp03Out.model_validate(out), STATS
         if schema is Cp04Out:
+            if self.bad_cp04:
+                return Cp04Out(items=[]), STATS
             items = [{"key": k, "ask": _ask(t)} for k, t in found]
             return Cp04Out.model_validate({"items": items}), STATS
         raise AssertionError(f"unexpected schema {schema.__name__}")

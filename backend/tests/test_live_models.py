@@ -15,9 +15,11 @@ from elucis.ai.ollama import OllamaClient
 from elucis.ai.prompts import (
     CP02,
     CP03,
+    CP04,
     ISSUE_CATEGORIES,
     Cp02Out,
     Cp03Out,
+    Cp04Out,
     PromptSpec,
     render_records,
 )
@@ -26,6 +28,7 @@ from elucis.core.errors import ModelUnavailableError
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL, EMBEDDING_DIMENSION
 from elucis.modules.analysis.classify import keys_exactly
 from elucis.modules.analysis.embedding import embed_texts
+from elucis.modules.analysis.requests import ask_rules
 from elucis.modules.analysis.themes import naming_rules
 
 pytestmark = pytest.mark.ollama
@@ -109,3 +112,19 @@ def test_real_cp03_names_a_theme_from_its_records(chat: Settings) -> None:
     out = _ask(chat, CP03, content, Cp03Out)
     naming_rules(keys)(out)
     assert len(out.name) <= 60
+
+
+def test_real_cp04_writes_short_asks_and_the_same_wording_for_the_same_request(
+    chat: Settings,
+) -> None:
+    texts = [
+        "Please add a dark mode, the white screen hurts at night",
+        "I wish there was a dark theme for night use",
+        "Can you add export to Excel for the monthly report",
+    ]
+    keys = [f"r{i + 1}" for i in range(len(texts))]
+    out = _ask(chat, CP04, render_records(list(zip(keys, texts, strict=True))), Cp04Out)
+    ask_rules(keys)(out)
+    asks = {i.key: i.ask.lower() for i in out.items}
+    assert "dark" in asks["r1"] and "dark" in asks["r2"]
+    assert "excel" in asks["r3"] or "export" in asks["r3"]
