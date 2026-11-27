@@ -37,3 +37,14 @@ export const stepLabels: Record<string, string> = {
   requests: "Grouping feature requests",
   stats: "Counting customers and weekly trends",
 };
+
+/** The CP-02 taxonomy (FR-THM-01) in words a product manager uses. */
+export const categoryLabels: Record<string, string> = {
+  bug_report: "Bug reports",
+  feature_request: "Feature requests",
+  usability_issue: "Usability issues",
+  performance_issue: "Performance issues",
+  praise: "Praise",
+  question: "Questions",
+  other: "Other",
+};

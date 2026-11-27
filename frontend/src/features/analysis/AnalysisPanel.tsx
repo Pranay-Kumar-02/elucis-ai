@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  categoryLabels,
   isActive,
   stepLabels,
   useAnalysisStatus,
@@ -98,6 +99,22 @@ export function AnalysisPanel({ membership }: { membership: MembershipOut }) {
                 {current.report.embedded.toLocaleString()}
               </dd>
             </div>
+            {current.report.themes !== undefined && (
+              <div>
+                <dt className="text-[12px] text-muted-foreground">Themes found</dt>
+                <dd className="tabular text-[22px] font-semibold">
+                  {current.report.themes.toLocaleString()}
+                </dd>
+              </div>
+            )}
+            {current.report.unclassified > 0 && (
+              <div>
+                <dt className="text-[12px] text-muted-foreground">Not labelled</dt>
+                <dd className="tabular text-[22px] font-semibold">
+                  {current.report.unclassified.toLocaleString()}
+                </dd>
+              </div>
+            )}
             {current.report.embedding_failed > 0 && (
               <div>
                 <dt className="text-[12px] text-muted-foreground">Could not be read</dt>
@@ -107,13 +124,26 @@ export function AnalysisPanel({ membership }: { membership: MembershipOut }) {
               </div>
             )}
           </dl>
-        ) : (
-          !running &&
-          records > 0 && (
-            <p className="text-[13px] text-muted-foreground">
-              No analysis has run yet in this workspace.
-            </p>
-          )
+        ) : null}
+        {current?.report?.categories && Object.keys(current.report.categories).length > 0 && (
+          <div>
+            <h3 className="text-[13px] font-semibold">Feedback by type</h3>
+            <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
+              {Object.entries(current.report.categories)
+                .sort(([, a], [, b]) => b - a)
+                .map(([category, n]) => (
+                  <li key={category}>
+                    {categoryLabels[category] ?? category}:{" "}
+                    <span className="tabular font-medium">{n.toLocaleString()}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+        {!current?.report && !running && records > 0 && (
+          <p className="text-[13px] text-muted-foreground">
+            No analysis has run yet in this workspace.
+          </p>
         )}
       </div>
     </section>

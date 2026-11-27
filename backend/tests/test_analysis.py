@@ -7,7 +7,6 @@ the real embedding model.
 
 from __future__ import annotations
 
-import hashlib
 import math
 import uuid
 from collections.abc import Callable, Iterator
@@ -15,55 +14,26 @@ from functools import partial
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
 from sqlalchemy import Engine, text
 
-from elucis.ai.ollama import CallStats, EmbedResult, InvalidModelOutputError
 from elucis.core.config import Settings
-from elucis.core.errors import ModelUnavailableError
 from elucis.modules.analysis import service
 from elucis.modules.analysis.orchestrator import run_analysis
 from elucis.modules.imports.pipeline import run_ingest
 from elucis.workers.runtime import Worker
 from tests.conftest import ApiClient
+from tests.fakes import FakeGateway, fake_vector
 from tests.schema_seed import bind
 
 pytestmark = pytest.mark.db
 
 Browser = Callable[[], ApiClient]
-STATS = CallStats("fake", 3, 0, None, 1.0, None, 2.0)
 FEEDBACK = (
     "review,user\n"
     "Checkout spins forever after I tap Pay,u1\n"
     "The export to Excel is slow,u2\n"
     "Please add dark mode,u3\n"
 )
-
-
-def fake_vector(text: str, dim: int = 1024) -> list[float]:
-    seed = hashlib.sha256(text.encode()).digest()
-    return [((seed[i % 32] + i) % 17) - 8.0 for i in range(dim)]  # not normalised on purpose
-
-
-class FakeGateway:
-    """Embeds deterministically; texts in ``bad`` fail; ``down`` makes every call fail."""
-
-    def __init__(self, bad: frozenset[str] = frozenset(), *, down: bool = False) -> None:
-        self.bad, self.down, self.calls = bad, down, 0
-
-    def embed(self, texts: list[str], **_: Any) -> EmbedResult:
-        self.calls += 1
-        if self.down:
-            raise ModelUnavailableError()
-        if any(t in self.bad for t in texts):
-            raise InvalidModelOutputError("bad input")
-        return EmbedResult(vectors=[fake_vector(t) for t in texts], stats=STATS)
-
-    def chat_json(self, *_: Any, **__: Any) -> tuple[BaseModel, CallStats]:
-        raise AssertionError("no chat calls in the embedding step")
-
-    def close(self) -> None:
-        pass
 
 
 @pytest.fixture

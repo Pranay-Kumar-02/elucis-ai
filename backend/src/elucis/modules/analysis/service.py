@@ -30,7 +30,7 @@ ACTIVE = ("queued", "running")
 
 
 def required_models(settings: Settings) -> list[str]:
-    return [CURRENT_EMBEDDING_MODEL]
+    return [CURRENT_EMBEDDING_MODEL, settings.ollama_chat_model]
 
 
 def check_models(settings: Settings) -> None:

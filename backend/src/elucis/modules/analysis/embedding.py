@@ -21,6 +21,7 @@ from elucis.core.errors import ModelUnavailableError
 from elucis.db.models import FeedbackRecord, RecordClassification, RecordEmbedding
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL, EMBEDDING_DIMENSION
 from elucis.modules.analysis.config import EMBED_BATCH_SIZE, EMBED_RETRIES
+from elucis.modules.analysis.context import RunContext
 from elucis.modules.analysis.gateway import ModelGateway, log_call
 from elucis.workers.runtime import JobContext
 
@@ -75,7 +76,8 @@ def _pending(ctx: JobContext, run_id: uuid.UUID) -> Any:
     )
 
 
-def embed_step(ctx: JobContext, run_id: uuid.UUID, gateway: ModelGateway) -> None:
+def embed_step(ctx: JobContext, run: RunContext) -> None:
+    run_id, gateway = run.run_id, run.gateway
     done = 0
     while True:
         with ctx.step() as (db, queue):

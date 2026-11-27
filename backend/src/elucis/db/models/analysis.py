@@ -29,12 +29,14 @@ from sqlalchemy.sql.elements import conv
 from elucis.db.base import Base
 from elucis.db.models._common import (
     CURRENT_EMBEDDING_MODEL,
+    EMPTY_ARRAY,
     EMPTY_OBJECT,
     NOW,
     Embedding,
     Json,
     StdColumns,
     Timestamp,
+    UuidArray,
     check,
     check_in,
     std_args,
@@ -298,6 +300,8 @@ class ThemeRunStats(StdColumns, Base):
     top_customer_share: Mapped[float | None] = mapped_column(REAL)
     vocal_flag: Mapped[bool | None] = mapped_column(Boolean)  # NULL = not assessable (A-11)
     emerging: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # Records CP-03 cited when naming the theme (migration 0003, IMP-33).
+    cited_record_ids: Mapped[list[uuid.UUID]] = mapped_column(UuidArray, server_default=EMPTY_ARRAY)
 
 
 class AggregatedRequest(StdColumns, Base):

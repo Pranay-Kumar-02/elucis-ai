@@ -15,6 +15,7 @@ fail closed: if ``mask`` raises, the record is not analysable (``pii_failed``).
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 from collections import Counter
@@ -37,7 +38,7 @@ PLACEHOLDERS = {
     "PERSON": "NAME",
     "ELUCIS_CUE_NAME": "NAME",
 }
-ENTITIES = list(PLACEHOLDERS)
+ENTITIES = [e for e in PLACEHOLDERS if e != "ELUCIS_CUE_NAME"]  # the cue rule runs in our code
 
 # Indian mobile numbers (+91 / 0 prefix optional, 10 digits starting 6-9) and international
 # numbers written with a + country code; US-style (415) 555-0132.
@@ -136,6 +137,9 @@ def _build_engine() -> AnalyzerEngine:
     from presidio_analyzer.nlp_engine import NlpEngineProvider  # noqa: PLC0415
     from presidio_analyzer.predefined_recognizers import InAadhaarRecognizer  # noqa: PLC0415
 
+    # Presidio warns once per call about spaCy labels it does not map (CARDINAL, DATE...);
+    # we only ask for the DR-28 entities, so those warnings carry no information.
+    logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
     nlp = NlpEngineProvider(
         nlp_configuration={
             "nlp_engine_name": "spacy",

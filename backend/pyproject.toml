@@ -28,6 +28,7 @@ dependencies = [
     "presidio-analyzer==2.2.366",
     "spacy==3.8.18",
     "en-core-web-sm",
+    "scikit-learn==1.9.1",
 ]
 
 [dependency-groups]
@@ -106,7 +107,7 @@ plugins = ["pydantic.mypy"]
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["pgvector.*", "dateutil.*"]
+module = ["pgvector.*", "dateutil.*", "sklearn.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

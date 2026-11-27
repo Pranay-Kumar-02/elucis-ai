@@ -72,7 +72,7 @@ def test_upgrade_head_is_idempotent_and_creates_the_d07_tables(
     schema, engine = scratch_schema
     upgrade_schema(database_url, schema)
     upgrade_schema(database_url, schema)  # second run is a no-op
-    assert _version(engine, schema) == "0002"
+    assert _version(engine, schema) == "0003"
     assert _tables(engine, schema) == d07_table_names()
     with engine.connect() as conn:
         ext = conn.execute(text("SELECT extversion FROM pg_extension WHERE extname='vector'"))

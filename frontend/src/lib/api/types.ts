@@ -263,9 +263,11 @@ export interface RunReport {
   embedding_failed: number;
   classified: number;
   unclassified: number;
+  themes?: number;
+  assigned?: number;
+  categories?: Record<string, number>;
   steps: string[];
   error?: string;
-  [key: string]: unknown;
 }
 
 export interface RunOut {

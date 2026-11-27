@@ -2,7 +2,7 @@
 
 Two kinds of version are recorded here: **pinned** versions, fixed in the lockfiles, and **measured** versions, read from a real machine by the setup scripts. The scripts write the full machine record to `.setup-reports\versions.json`, `postgres-wsl.json` and `ollama-check.json`.
 
-Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every transitive package with hashes (`backend/uv.lock`: 93 packages for Windows, Linux and macOS; `frontend/pnpm-lock.yaml`). Only releases published at least 14 days before the lock date (10 Nov 2026) are allowed (IMP-06).
+Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every transitive package with hashes (`backend/uv.lock`: 99 packages for Windows, Linux and macOS; `frontend/pnpm-lock.yaml`). Only releases published at least 14 days before the lock date (10 Nov 2026) are allowed (IMP-06).
 
 ## Platform baseline
 
@@ -37,6 +37,7 @@ Pinning policy: direct dependencies are pinned exactly; the lockfiles pin every 
 | python-dateutil | 4.0.0 | Reading written dates in feedback files (D06 step 7) |
 | presidio-analyzer | 2.2.366 | PII detection (SVC-06, DR-28, IMP-31) |
 | spacy | 3.8.18 | NLP engine for Presidio (personal names) |
+| scikit-learn | 1.9.1 | PCA and HDBSCAN for themes, agglomerative clustering for requests (SVC-11, SVC-12); brings numpy 2.4.6 and scipy 1.18.1 |
 | en_core_web_sm | 3.8.0 | spaCy small English model; wheel from the official spacy-models GitHub release, locked by URL and SHA-256 |
 | *dev:* ruff | 0.17.4 | Formatter and linter |
 | *dev:* mypy | 2.4.1 | Static type checking (strict) |
