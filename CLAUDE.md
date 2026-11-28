@@ -55,6 +55,7 @@ Implemented and verified (383 backend tests with 0 skipped, 48 frontend tests, b
 - Foundation: settings, errors, logging, middleware, health endpoints, database engines and RLS helper, Alembic baseline, job queue worker, Ollama gateway, Argon2id hashing, app shell with D12 navigation and themes.
 - Source fetching (SVC-02 + SVC-04, IMP-17 to IMP-20): CSV/JSON/TXT/pasted-text reading with encoding, delimiter and malformed-row handling; column-mapping suggestions and rules; row validation and normalisation to D07 names; development endpoints `POST /api/v1/dev/sources/{preview,validate,fetch}` (need `ENABLE_DEV_ENDPOINTS=true`); Imports screen (upload or paste → preview → match columns → check records).
 - Database schema (migration 0002, IMP-22 to IMP-26): the 54 D07 tables, composite tenant keys, CHECKs, B-tree/GIN/HNSW indexes, `raw_text` trigger, forced RLS on 48 tenant tables, per-role grants (audit append-only), ORM models in `backend/src/elucis/db/models/` proven identical to the live schema. Applied to `elucis_dev`.
+- Evaluation (docs/evaluation/): MODEL_BENCHMARK.md (qwen3:4b kept), ACCURACY_REPORT.md (scripts/evaluate.py on the approved Zenodo set), labelling sheet and guide.
 - Insights dashboard (IMP-36): the Dashboard shows filters, tiles, pain points and themes with trends and evidence, and request groups once a run has succeeded.
 - Trends and insights API (IMP-35): weekly series and trend per theme and request group in SQL, period and source filters, API-33/34/37/38 and `/insights`.
 - Feature requests (IMP-34): candidates, CP-04 canonical asks, agglomerative grouping (threshold to tune, F-08).
@@ -70,7 +71,7 @@ This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-
 ## Next tasks, in order
 
 Milestone 2 (due 4 Dec 2026), plan approved 27 Nov; commit and push per step after checks pass:
-1. ~~Import pipeline~~ (done). 2. ~~PII masking, exact duplicates, embeddings~~ (done). 3. ~~CP-02 classification, themes and CP-03 naming~~ (done). 4. ~~Feature requests~~ (done; threshold tuning in step 8, F-08). 5. ~~Weekly trends in SQL~~ (done). 6. ~~Insights dashboard~~ (done). 7. Benchmark qwen3:4b vs qwen3:4b-instruct. 8. Accuracy evaluation on a licensed, labelled public dataset (never invented). Then optional Gemini backup (off by default) and `docs/learning/CODE_WALKTHROUGH.md`.
+1. ~~Import pipeline~~ (done). 2. ~~PII masking, exact duplicates, embeddings~~ (done). 3. ~~CP-02 classification, themes and CP-03 naming~~ (done). 4. ~~Feature requests~~ (done; threshold tuning in step 8, F-08). 5. ~~Weekly trends in SQL~~ (done). 6. ~~Insights dashboard~~ (done). 7. ~~Benchmark~~ (done: keep qwen3:4b). 8. ~~Accuracy evaluation~~ (done on the Zenodo set: issue F1 0.89, request F1 0.86; theme coverage 19%, tune per F-12 with team labels). Then optional Gemini backup (off by default) and `docs/learning/CODE_WALKTHROUGH.md`.
 
 Decided follow-ups: when building SVC-14, measure keyword-search latency on realistic volume; if it misses the NFR target, add a SECURITY DEFINER search function with leak tests (F-06, never mark pg_catalog functions LEAKPROOF). Before the first free-text CP call, benchmark `qwen3:4b-instruct` against `qwen3:4b` (F-01).
 

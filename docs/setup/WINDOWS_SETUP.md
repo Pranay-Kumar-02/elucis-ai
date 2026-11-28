@@ -85,4 +85,5 @@ To rotate database passwords: edit the three URLs in `.env`, then run `30-setup-
 | `127.0.0.1:5432` not reachable | `.\scripts\windows\dev-db.ps1 status`, then `start`. Check `wsl --status` |
 | `pnpm install` fails with an engines error | Node.js is older than 22.22.0: run step 1 again and accept the upgrade |
 | Model test is slow or runs on the CPU | Close other GPU or RAM-heavy apps. `.setup-reports\ollama-check.json` → `gpu_offload` shows how much of each model is in VRAM |
+| Models are extremely slow (1–2 tokens/s) although they are "100% GPU" | Windows power mode is limiting the GPU: `nvidia-smi -q -d PERFORMANCE` shows "SW Power Cap: Active" and the clock stays near 210 MHz. Set Settings › System › Power & battery › Power mode to **Best performance** (or `powercfg /overlaysetactive ded574b5-45a0-4f42-8737-46345c09c238`), on the laptop's own power adapter (F-11) |
 | `uv sync` or `pnpm install` stalls or reports locked files | The project is inside OneDrive: move it out (section 1) |

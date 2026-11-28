@@ -54,6 +54,16 @@ SOURCES = {
     ),
     "team": "Labels by the Elucis AI team, using docs/evaluation/LABELLING_GUIDE.md.",
 }
+CAVEATS = {
+    "zenodo": (
+        "Scope of these labels (F-09): only privacy-related bug reports and feature requests are "
+        "labelled; the scores use the records labelled one of those two, where the label is "
+        "definite. The texts are lower-cased by the authors, some read as machine-written, and "
+        "the set has no customer IDs or dates. Treat the figures as an indicative public "
+        "benchmark, not as accuracy on our customers' feedback."
+    ),
+    "team": "",
+}
 
 
 def yes_no(value: str) -> bool | None:
@@ -170,6 +180,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915 - one linear report
         "",
         f"**Labels:** {SOURCES[args.source]}",
         "",
+        *([CAVEATS[args.source], ""] if CAVEATS[args.source] else []),
         f"Label rows: {len(labels)}. Found in the workspace: {len(labels) - len(missing)}. "
         f"Not classified in the run (excluded before analysis or failed): {sum(excluded.values())}"
         + (f" ({', '.join(f'{k} {v}' for k, v in excluded.most_common())})" if excluded else "")
@@ -200,6 +211,22 @@ def main() -> int:  # noqa: PLR0912, PLR0915 - one linear report
         lines.append(
             f"| `{c}` | {s.tp + s.fn} | {fmt(s.precision)} | {fmt(s.recall)} | {fmt(s.f1)} |"
         )
+    report = run.report or {}
+    classified = int(report.get("classified") or 0)
+    lines += [
+        "",
+        "## Coverage of themes and request groups (from the run, no labels needed)",
+        "",
+        "| Measure | Value |",
+        "|---|---|",
+        f"| Themes | {report.get('themes', 'n/a')} |",
+        f"| Classified records in a theme | {report.get('assigned', 0)} of {classified}"
+        f" ({(report.get('assigned', 0) / classified) if classified else 0:.0%}) |",
+        f"| Request groups | {report.get('requests', 'n/a')} for {report.get('request_records', 0)} request records |",
+        "",
+        "D03 (EXP-06) asks for at least 70% of records in a theme; many groups with one or two "
+        "records mean the grouping threshold is too strict (F-08, F-12).",
+    ]
     lines += ["", "## Feature grouping", ""]
     if truth_groups:
         pw = pairwise_scores(truth_groups, predicted_groups)
