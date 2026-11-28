@@ -2,10 +2,13 @@ import { CheckCircle2, CircleAlert, CircleDashed } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { product } from "@/config/product";
 import { AnalysisPanel } from "@/features/analysis/AnalysisPanel";
+import { isActive, useAnalysisStatus } from "@/features/analysis/queries";
+import { InsightsView } from "@/features/insights/InsightsView";
 import { useHealth } from "@/features/system/queries";
 import { aiPausedReason } from "@/features/system/status";
 import { useActiveWorkspace } from "@/features/workspaces/active";
@@ -34,9 +37,9 @@ const stateMeta: Record<
 };
 
 /**
- * Dashboard (UI-11). There is no workspace data yet, so this is the empty state D12 §4
- * asks for: explain why it is empty and offer the next action. Every status shown comes
- * from the live health endpoint; nothing here is sample data.
+ * Dashboard (UI-11). With a successful analysis it is the Insights page; before that it is
+ * the empty state D12 §4 asks for ("Import and analyse feedback to see insights"): why it
+ * is empty and the next action. Every status shown comes from the live API.
  */
 export function DashboardPage() {
   const health = useHealth();
@@ -45,6 +48,23 @@ export function DashboardPage() {
   const dbReady = db?.status === "ok";
   const aiReason = aiPausedReason(ai);
   const { active } = useActiveWorkspace();
+  const analysis = useAnalysisStatus(dbReady ? active?.workspace_id : undefined);
+  const currentRun = analysis.data?.current_run;
+
+  if (active && currentRun) {
+    return (
+      <>
+        <PageHeader
+          title="Insights"
+          description="Pain points, themes and feature requests from your customers' feedback. Every figure links back to the records behind it."
+        />
+        <div className="space-y-8">
+          <AnalysisPanel membership={active} />
+          <InsightsView ws={active.workspace_id} rerunning={isActive(analysis.data?.latest_run)} />
+        </div>
+      </>
+    );
+  }
 
   const steps: SetupStep[] = [
     {

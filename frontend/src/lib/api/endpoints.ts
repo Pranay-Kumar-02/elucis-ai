@@ -6,17 +6,21 @@ import type {
   FilePreviewOut,
   HealthOut,
   ImportOut,
+  InsightsFilters,
+  InsightsOut,
   ImportStatus,
   JobRef,
   MemberOut,
   MeOut,
   ModelRuntimeHealthOut,
   Page,
+  RequestOut,
   Role,
   SourceFileOut,
   SourceInfoOut,
   SourceType,
   StoredRowErrorOut,
+  ThemeOut,
   UserOut,
   ValidationReportOut,
   WorkspaceOut,
@@ -162,4 +166,29 @@ export const api = {
       headers: { "Idempotency-Key": idempotencyKey },
       timeoutMs: 30_000,
     }),
+
+  // ---- insights (IMP-35, API-34, API-38)
+  insights: (ws: string, filters: InsightsFilters, signal?: AbortSignal) =>
+    apiRequest<InsightsOut>(`/workspaces/${ws}/insights?${insightsQuery(filters)}`, {
+      ...(signal && { signal }),
+      timeoutMs: 60_000,
+    }),
+  themeDetail: (ws: string, id: string, filters: InsightsFilters, signal?: AbortSignal) =>
+    apiRequest<ThemeOut>(`/workspaces/${ws}/themes/${id}?${insightsQuery(filters)}`, {
+      ...(signal && { signal }),
+    }),
+  requestDetail: (ws: string, id: string, filters: InsightsFilters, signal?: AbortSignal) =>
+    apiRequest<RequestOut>(`/workspaces/${ws}/requests/${id}?${insightsQuery(filters)}`, {
+      ...(signal && { signal }),
+    }),
 };
+
+/** Period, source and pain-point filters as query parameters (IMP-35). */
+export function insightsQuery(filters: InsightsFilters): string {
+  const query = new URLSearchParams();
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
+  if (filters.source_type) query.set("source_type", filters.source_type);
+  if (filters.pain_points_only) query.set("pain_points_only", "true");
+  return query.toString();
+}

@@ -293,3 +293,71 @@ export interface AnalysisStatusOut {
   current_run: RunOut | null;
   latest_run: RunOut | null;
 }
+
+// ---- insights (API-33, API-34, API-37, API-38, IMP-35)
+export type Trend = "up" | "flat" | "down";
+
+export interface WeekOut {
+  week: string;
+  start: string;
+  n: number;
+}
+
+export interface EvidenceOut {
+  record_id: string;
+  text: string;
+  occurred_at: string | null;
+  rating: number | null;
+  source_type: string;
+  cited: boolean;
+}
+
+export interface GroupStatsOut {
+  record_count: number;
+  known_customers: number;
+  unknown_identity_records: number;
+  identity_coverage: number;
+  share: number;
+  sentiment: Record<string, number>;
+  weekly: WeekOut[];
+  undated: number;
+  trend: Trend;
+}
+
+export interface ThemeOut extends GroupStatsOut {
+  id: string;
+  name: string;
+  description: string | null;
+  pain_point: boolean;
+  vocal_flag: boolean | null;
+  categories: Record<string, number>;
+  evidence: EvidenceOut[];
+}
+
+export interface RequestOut extends GroupStatsOut {
+  id: string;
+  title: string;
+  asks: { ask: string; n: number }[];
+  low_confidence: number;
+  evidence: EvidenceOut[];
+}
+
+export interface InsightsFilters {
+  from?: string;
+  to?: string;
+  source_type?: string;
+  pain_points_only?: boolean;
+}
+
+export interface InsightsOut {
+  run_id: string | null;
+  run_finished_at: string | null;
+  filters: Record<string, string | null>;
+  records_analysed: number;
+  themes: ThemeOut[];
+  unassigned: number;
+  pain_points: number;
+  requests: RequestOut[];
+  source_types: string[];
+  date_range: { from: string | null; to: string | null };
+}

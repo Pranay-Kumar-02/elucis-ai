@@ -55,6 +55,7 @@ Implemented and verified (383 backend tests with 0 skipped, 48 frontend tests, b
 - Foundation: settings, errors, logging, middleware, health endpoints, database engines and RLS helper, Alembic baseline, job queue worker, Ollama gateway, Argon2id hashing, app shell with D12 navigation and themes.
 - Source fetching (SVC-02 + SVC-04, IMP-17 to IMP-20): CSV/JSON/TXT/pasted-text reading with encoding, delimiter and malformed-row handling; column-mapping suggestions and rules; row validation and normalisation to D07 names; development endpoints `POST /api/v1/dev/sources/{preview,validate,fetch}` (need `ENABLE_DEV_ENDPOINTS=true`); Imports screen (upload or paste → preview → match columns → check records).
 - Database schema (migration 0002, IMP-22 to IMP-26): the 54 D07 tables, composite tenant keys, CHECKs, B-tree/GIN/HNSW indexes, `raw_text` trigger, forced RLS on 48 tenant tables, per-role grants (audit append-only), ORM models in `backend/src/elucis/db/models/` proven identical to the live schema. Applied to `elucis_dev`.
+- Insights dashboard (IMP-36): the Dashboard shows filters, tiles, pain points and themes with trends and evidence, and request groups once a run has succeeded.
 - Trends and insights API (IMP-35): weekly series and trend per theme and request group in SQL, period and source filters, API-33/34/37/38 and `/insights`.
 - Feature requests (IMP-34): candidates, CP-04 canonical asks, agglomerative grouping (threshold to tune, F-08).
 - Classification and themes (IMP-33): CP-02 labels, PCA + HDBSCAN themes, CP-03 names with checked citations, theme statistics and trends (migration 0003, applied to `elucis_dev`).
@@ -62,14 +63,14 @@ Implemented and verified (383 backend tests with 0 skipped, 48 frontend tests, b
 - Stored imports (SVC-03, IMP-30): API-14 to API-18 under `/workspaces/{ws}`, the `ingest` job (batches of 500, checkpoints, DR-40 reconciliation), "Start import" on, import history and report page.
 - Authentication and workspaces (SVC-01, IMP-28, IMP-29): API-01 to API-13, server-side sessions, CSRF, throttling, `WorkspaceAccess` (404 non-members, 403 + audit), workspace deletion job with the IMP-24 audit rule, worker retention purges; UI-01 screens (sign-in, registration, workspaces, settings, members, danger zone, switcher).
 
-Not built yet: the Insights dashboard page, all AI calls CP-01 to CP-10, the other production screens. Deferred for milestone 2: spam, sarcasm, language detection, metric imports.
+Not built yet: CP-01 and CP-05 to CP-10 (spam check, prioritisation, PRDs, summaries, assistant), the other production screens. Deferred for milestone 2: spam, sarcasm, language detection, metric imports.
 
 This laptop: PostgreSQL 18.7 + pgvector 0.8.7 running in WSL Ubuntu 24.04 (`dev-db.ps1 start`), databases `elucis_dev` and `elucis_test`, `.env` created; Ollama 0.40.4 with `qwen3:4b` and `qwen3-embedding:0.6b` (measured dimension 1024, F-02 closed; `qwen3:4b` leaks reasoning into free-text replies, F-01 open); Node 22.23.5 (IMP-05 closed).
 
 ## Next tasks, in order
 
 Milestone 2 (due 4 Dec 2026), plan approved 27 Nov; commit and push per step after checks pass:
-1. ~~Import pipeline~~ (done). 2. ~~PII masking, exact duplicates, embeddings~~ (done). 3. ~~CP-02 classification, themes and CP-03 naming~~ (done). 4. ~~Feature requests~~ (done; threshold tuning in step 8, F-08). 5. ~~Weekly trends in SQL~~ (done). 6. Insights dashboard. 7. Benchmark qwen3:4b vs qwen3:4b-instruct. 8. Accuracy evaluation on a licensed, labelled public dataset (never invented). Then optional Gemini backup (off by default) and `docs/learning/CODE_WALKTHROUGH.md`.
+1. ~~Import pipeline~~ (done). 2. ~~PII masking, exact duplicates, embeddings~~ (done). 3. ~~CP-02 classification, themes and CP-03 naming~~ (done). 4. ~~Feature requests~~ (done; threshold tuning in step 8, F-08). 5. ~~Weekly trends in SQL~~ (done). 6. ~~Insights dashboard~~ (done). 7. Benchmark qwen3:4b vs qwen3:4b-instruct. 8. Accuracy evaluation on a licensed, labelled public dataset (never invented). Then optional Gemini backup (off by default) and `docs/learning/CODE_WALKTHROUGH.md`.
 
 Decided follow-ups: when building SVC-14, measure keyword-search latency on realistic volume; if it misses the NFR target, add a SECURITY DEFINER search function with leak tests (F-06, never mark pg_catalog functions LEAKPROOF). Before the first free-text CP call, benchmark `qwen3:4b-instruct` against `qwen3:4b` (F-01).
 
