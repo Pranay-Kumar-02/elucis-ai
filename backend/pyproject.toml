@@ -89,6 +89,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "PLR2004", "S608"]
 "migrations/**" = ["ERA001"]
+# Evaluation scripts print progress, write Markdown tables and sample with a fixed seed.
+"scripts/**" = ["T201", "E501", "S311", "PLR0917", "PLR2004"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

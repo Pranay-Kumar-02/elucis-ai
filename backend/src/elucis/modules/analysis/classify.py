@@ -19,7 +19,13 @@ from elucis.ai.prompts import CP02, Cp02Out, render_records
 from elucis.db.models import FeedbackRecord, RecordClassification, RecordEmbedding
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL
 from elucis.modules.analysis.context import RunContext
-from elucis.modules.analysis.tasks import OutputRuleError, TaskContext, run_task
+from elucis.modules.analysis.tasks import (
+    OutputRuleError,
+    TaskContext,
+    flush_calls,
+    register_prompts,
+    run_task,
+)
 from elucis.workers.runtime import JobContext
 
 BATCH = 10  # D04 CP-02
@@ -79,32 +85,36 @@ def classify_batch(tc: TaskContext, texts: list[str]) -> list[tuple[str, str] | 
 
 
 def classify_step(ctx: JobContext, run: RunContext) -> None:
+    """Per batch: read (short transaction) -> CP-02 (no transaction open) -> write the labels,
+    the call records and the checkpoint together."""
     ws, run_id = ctx.job.workspace_id, run.run_id
+    with ctx.step() as (db, _queue):
+        prompt_ids = register_prompts(db, CP02)
     done = 0
     while True:
-        with ctx.step() as (db, queue):
+        with ctx.step() as (db, _queue):
             batch = db.execute(_pending(ws, run_id)).all()
-            if not batch:
-                return
-            tc = TaskContext(db, run.gateway, ws, ctx.job.id, run.chat_model)
-            labels = classify_batch(tc, [r.processed_text or "" for r in batch])
-            rows = []
-            for record, label in zip(batch, labels, strict=True):
-                row: dict[str, Any] = {
-                    "workspace_id": ws,
-                    "analysis_run_id": run_id,
-                    "record_id": record.id,
-                    "status": "unclassified",
-                    "category": None,
-                    "sentiment": None,
-                    "method": None,
-                }
-                if label is not None:
-                    row.update(
-                        status="classified", category=label[0], sentiment=label[1], method="llm"
-                    )
-                rows.append(row)
+        if not batch:
+            return
+        tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+        labels = classify_batch(tc, [r.processed_text or "" for r in batch])
+        rows = []
+        for record, label in zip(batch, labels, strict=True):
+            row: dict[str, Any] = {
+                "workspace_id": ws,
+                "analysis_run_id": run_id,
+                "record_id": record.id,
+                "status": "unclassified",
+                "category": None,
+                "sentiment": None,
+                "method": None,
+            }
+            if label is not None:
+                row.update(status="classified", category=label[0], sentiment=label[1], method="llm")
+            rows.append(row)
+        with ctx.step() as (db, queue):
             db.execute(pg_insert(RecordClassification).values(rows).on_conflict_do_nothing())
+            flush_calls(db, tc)
             done += len(batch)
             queue.checkpoint(
                 ctx.job, {"step": "classify"}, {"step": "classify", "classified": done}

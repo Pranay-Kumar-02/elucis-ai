@@ -34,8 +34,13 @@ from elucis.db.models import (
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL
 from elucis.modules.analysis.context import RunContext
 from elucis.modules.analysis.embedding import embed_texts
-from elucis.modules.analysis.gateway import log_call
-from elucis.modules.analysis.tasks import OutputRuleError, TaskContext, run_task
+from elucis.modules.analysis.tasks import (
+    OutputRuleError,
+    TaskContext,
+    flush_calls,
+    register_prompts,
+    run_task,
+)
 from elucis.workers.runtime import JobContext
 
 BATCH = 10
@@ -92,9 +97,63 @@ def group_asks(vectors: np.ndarray) -> np.ndarray:
 
 
 def requests_step(ctx: JobContext, run: RunContext) -> None:
+    """Read the candidates (short transaction) -> CP-04 asks and their embeddings (no
+    transaction open) -> write the groups, memberships and call records together."""
     ws, run_id = ctx.job.workspace_id, run.run_id
     fr, rc = FeedbackRecord, RecordClassification
+    with ctx.step() as (db, _queue):
+        prompt_ids = register_prompts(db, CP04)
+        rows = db.execute(
+            select(fr.id, fr.processed_text, rc.category)
+            .join(rc, and_(rc.workspace_id == fr.workspace_id, rc.record_id == fr.id))
+            .where(rc.workspace_id == ws, rc.analysis_run_id == run_id, rc.status == "classified")
+            .order_by(fr.created_at, fr.row_number, fr.segment_index, fr.id)
+        ).all()
+    candidates = [
+        (r.id, r.processed_text or "")
+        for r in rows
+        if is_candidate(r.category, r.processed_text or "")
+    ]
+    tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+    asks: list[str] = []
+    low: list[bool] = []
+    groups: list[tuple[str, list[int]]] = []
+    if candidates:
+        for start in range(0, len(candidates), BATCH):
+            texts = [t for _, t in candidates[start : start + BATCH]]
+            for text, ask in zip(texts, canonical_asks(tc, texts), strict=True):
+                asks.append(cut_words(ask) if ask else cut_words(text))
+                low.append(ask is None)
+
+        def log(inputs: list[str], outcome: str, attempt: int, stats: Any = None) -> None:
+            tc.pending.append(
+                {
+                    "workspace_id": ws,
+                    "job_id": ctx.job.id,
+                    "call_id": "EMBED",
+                    "model": CURRENT_EMBEDDING_MODEL,
+                    "inputs": inputs,
+                    "outcome": outcome,
+                    "attempt": attempt,
+                    "stats": stats,
+                }
+            )
+
+        vectors = np.array(
+            [
+                v
+                for start in range(0, len(asks), 64)
+                for v in embed_texts(run.gateway, asks[start : start + 64], log)
+            ]
+        )
+        labels = group_asks(vectors)
+        for label in sorted(set(labels.tolist())):
+            members = np.flatnonzero(labels == label)
+            centroid = vectors[members].mean(axis=0)
+            title = asks[int(members[np.argmax(vectors[members] @ centroid)])]
+            groups.append((title, [int(i) for i in members]))
     with ctx.step() as (db, queue):
+        # Idempotent: a retried step replaces this run's request groups.
         db.execute(
             delete(RequestMembership).where(
                 RequestMembership.workspace_id == ws, RequestMembership.analysis_run_id == run_id
@@ -105,74 +164,30 @@ def requests_step(ctx: JobContext, run: RunContext) -> None:
                 AggregatedRequest.workspace_id == ws, AggregatedRequest.first_run_id == run_id
             )
         )
-        rows = db.execute(
-            select(fr.id, fr.processed_text, rc.category)
-            .join(rc, and_(rc.workspace_id == fr.workspace_id, rc.record_id == fr.id))
-            .where(rc.workspace_id == ws, rc.analysis_run_id == run_id, rc.status == "classified")
-            .order_by(fr.created_at, fr.row_number, fr.segment_index, fr.id)
-        ).all()
-        candidates = [
-            (r.id, r.processed_text or "")
-            for r in rows
-            if is_candidate(r.category, r.processed_text or "")
-        ]
-        if candidates:
-            tc = TaskContext(db, run.gateway, ws, ctx.job.id, run.chat_model)
-            asks: list[str] = []
-            low: list[bool] = []
-            for start in range(0, len(candidates), BATCH):
-                texts = [t for _, t in candidates[start : start + BATCH]]
-                for text, ask in zip(texts, canonical_asks(tc, texts), strict=True):
-                    asks.append(cut_words(ask) if ask else cut_words(text))
-                    low.append(ask is None)
-
-            def log(inputs: list[str], outcome: str, attempt: int, stats: Any = None) -> None:
-                log_call(
-                    db,
+        for title, indexes in groups:
+            request_id = uuid.uuid4()
+            db.add(
+                AggregatedRequest(
+                    id=request_id,
                     workspace_id=ws,
-                    job_id=ctx.job.id,
-                    call_id="EMBED",
-                    model=CURRENT_EMBEDDING_MODEL,
-                    inputs=inputs,
-                    outcome=outcome,
-                    attempt=attempt,
-                    stats=stats,
+                    title=title,
+                    first_run_id=run_id,
+                    last_run_id=run_id,
                 )
-
-            vectors = np.array(
-                [
-                    v
-                    for start in range(0, len(asks), 64)
-                    for v in embed_texts(run.gateway, asks[start : start + 64], log)
-                ]
             )
-            labels = group_asks(vectors)
-            for label in sorted(set(labels.tolist())):
-                members = np.flatnonzero(labels == label)
-                centroid = vectors[members].mean(axis=0)
-                title = asks[int(members[np.argmax(vectors[members] @ centroid)])]
-                request_id = uuid.uuid4()
-                db.add(
-                    AggregatedRequest(
-                        id=request_id,
-                        workspace_id=ws,
-                        title=title,
-                        first_run_id=run_id,
-                        last_run_id=run_id,
-                    )
+            db.flush()
+            db.add_all(
+                RequestMembership(
+                    workspace_id=ws,
+                    analysis_run_id=run_id,
+                    request_id=request_id,
+                    record_id=candidates[i][0],
+                    canonical_ask=asks[i],
+                    low_confidence=low[i],
                 )
-                db.flush()
-                db.add_all(
-                    RequestMembership(
-                        workspace_id=ws,
-                        analysis_run_id=run_id,
-                        request_id=request_id,
-                        record_id=candidates[i][0],
-                        canonical_ask=asks[i],
-                        low_confidence=low[i],
-                    )
-                    for i in members
-                )
+                for i in indexes
+            )
+        flush_calls(db, tc)
         queue.checkpoint(
             ctx.job, {"step": "requests"}, {"step": "requests", "candidates": len(candidates)}
         )

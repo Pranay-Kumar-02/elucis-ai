@@ -9,7 +9,8 @@
   ``None`` and the caller uses its fallback;
 * an unreachable runtime is retried twice with a short wait, then raised, so the step fails
   and the job retries later rather than marking records as failed;
-* every attempt is written to ``llm_call_records`` with the prompt version (AIR-12).
+* every attempt becomes an ``llm_call_records`` row with the prompt version (AIR-12),
+  written with the step's results (``flush_calls``), never while a call is in flight.
 """
 
 from __future__ import annotations
@@ -18,7 +19,8 @@ import logging
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -44,11 +46,29 @@ class OutputRuleError(ValueError):
 
 @dataclass(slots=True)
 class TaskContext:
-    db: Session
+    """What a model call needs. It holds **no database session**: model calls can take
+    minutes, and a transaction must never stay open across one (the roles'
+    ``idle_in_transaction_session_timeout`` is 60 s, and an open transaction holds locks).
+    Call records collect in ``pending`` and are written by ``flush_calls`` in the step's
+    next transaction, together with the results."""
+
     gateway: ModelGateway
     workspace_id: uuid.UUID
     job_id: uuid.UUID | None
     model: str
+    prompt_ids: dict[str, uuid.UUID]
+    pending: list[dict[str, Any]] = field(default_factory=list)
+
+
+def register_prompts(db: Session, *specs: PromptSpec) -> dict[str, uuid.UUID]:
+    """``{call_id: prompt_versions.id}``, registering the prompts on first use."""
+    return {spec.call_id: prompt_version_id(db, spec) for spec in specs}
+
+
+def flush_calls(db: Session, tc: TaskContext) -> None:
+    for entry in tc.pending:
+        log_call(db, **entry)
+    tc.pending.clear()
 
 
 def prompt_version_id(db: Session, spec: PromptSpec) -> uuid.UUID:
@@ -86,7 +106,7 @@ def run_task[T: BaseModel](
     *,
     sleep: Callable[[float], None] = time.sleep,
 ) -> T | None:
-    version_id = prompt_version_id(tc.db, spec)
+    version_id = tc.prompt_ids[spec.call_id]
     messages = [
         {"role": "system", "content": spec.system},
         {"role": "user", "content": user_content},
@@ -142,15 +162,16 @@ def _log(  # noqa: PLR0917 - internal helper
     attempt: int,
     stats: object = None,
 ) -> None:
-    log_call(
-        tc.db,
-        workspace_id=tc.workspace_id,
-        job_id=tc.job_id,
-        call_id=spec.call_id,
-        model=tc.model,
-        inputs=[spec.system, content],
-        outcome=outcome,
-        attempt=attempt,
-        stats=stats,  # type: ignore[arg-type]
-        prompt_version_id=version_id,
+    tc.pending.append(
+        {
+            "workspace_id": tc.workspace_id,
+            "job_id": tc.job_id,
+            "call_id": spec.call_id,
+            "model": tc.model,
+            "inputs": [spec.system, content],
+            "outcome": outcome,
+            "attempt": attempt,
+            "stats": stats,
+            "prompt_version_id": version_id,
+        }
     )

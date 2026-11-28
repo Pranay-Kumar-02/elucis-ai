@@ -306,3 +306,50 @@ def test_a_new_run_replaces_the_current_themes(
         for r in _rows(owner_engine, ws, "SELECT DISTINCT first_run_id, status FROM themes")
     }
     assert status == {uuid.UUID(first): "archived", uuid.UUID(second): "active"}
+
+
+class WatchingGateway(FakeGateway):
+    """Records, at every model call, whether a worker connection is idle in a transaction."""
+
+    def __init__(self, owner_engine: Engine) -> None:
+        super().__init__()
+        self.owner_engine = owner_engine
+        self.open_transactions: list[int] = []
+
+    def _check(self) -> None:
+        with self.owner_engine.connect() as conn:
+            self.open_transactions.append(
+                int(
+                    conn.execute(
+                        text(
+                            "SELECT count(*) FROM pg_stat_activity WHERE usename = 'app_worker'"
+                            " AND state = 'idle in transaction'"
+                        )
+                    ).scalar_one()
+                )
+            )
+
+    def embed(self, texts: list[str], **kwargs: Any) -> Any:
+        self._check()
+        return super().embed(texts, **kwargs)
+
+    def chat_json(self, *args: Any, **kwargs: Any) -> Any:
+        self._check()
+        return super().chat_json(*args, **kwargs)
+
+
+@pytest.mark.db
+def test_no_transaction_is_open_while_the_model_works(
+    analysed: dict[str, Any], worker_engine: Engine, owner_engine: Engine, api_settings: Settings
+) -> None:
+    """Model calls can take minutes; a transaction held across one would hit the roles'
+    60 s idle-in-transaction timeout and hold locks (found on 28 Nov 2026 at real scale)."""
+    owner, ws = analysed["owner"], analysed["ws"]
+    run_id = _run(owner, ws)
+    gateway = WatchingGateway(owner_engine)
+    _work(worker_engine, api_settings, gateway)
+    assert owner.call("GET", f"/workspaces/{ws}/analysis-runs/{run_id}").json()["status"] == (
+        "succeeded"
+    )
+    assert len(gateway.open_transactions) > 5  # embed, CP-02, CP-03, CP-04 calls were watched
+    assert set(gateway.open_transactions) == {0}

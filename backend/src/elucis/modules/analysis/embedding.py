@@ -77,49 +77,55 @@ def _pending(ctx: JobContext, run_id: uuid.UUID) -> Any:
 
 
 def embed_step(ctx: JobContext, run: RunContext) -> None:
-    run_id, gateway = run.run_id, run.gateway
+    """Per batch: read (short transaction) -> embed (no transaction open) -> write the
+    vectors, failures, call records and checkpoint together."""
+    run_id, gateway, ws = run.run_id, run.gateway, ctx.job.workspace_id
     done = 0
     while True:
-        with ctx.step() as (db, queue):
+        with ctx.step() as (db, _queue):
             batch = db.execute(_pending(ctx, run_id)).all()
-            if not batch:
-                return
-            ids = [r.id for r in batch]
-            texts = [r.processed_text or "" for r in batch]
+        if not batch:
+            return
+        ids = [r.id for r in batch]
+        texts = [r.processed_text or "" for r in batch]
+        calls: list[dict[str, Any]] = []
 
-            def log(inputs: list[str], outcome: str, attempt: int, stats: Any = None) -> None:
-                log_call(
-                    db,
-                    workspace_id=ctx.job.workspace_id,
-                    job_id=ctx.job.id,
-                    call_id="EMBED",
-                    model=CURRENT_EMBEDDING_MODEL,
-                    inputs=inputs,
-                    outcome=outcome,
-                    attempt=attempt,
-                    stats=stats,
-                )
-
-            vectors = _embed_with_fallback(gateway, texts, log)
-            stored = [
+        def log(inputs: list[str], outcome: str, attempt: int, stats: Any = None) -> None:
+            calls.append(  # noqa: B023 - collected for this batch only
                 {
-                    "workspace_id": ctx.job.workspace_id,
-                    "record_id": rid,
-                    "model_id": CURRENT_EMBEDDING_MODEL,
-                    "embedding": vec,
+                    "workspace_id": ws,
+                    "job_id": ctx.job.id,
+                    "call_id": "EMBED",
+                    "model": CURRENT_EMBEDDING_MODEL,
+                    "inputs": inputs,
+                    "outcome": outcome,
+                    "attempt": attempt,
+                    "stats": stats,
                 }
-                for rid, vec in zip(ids, vectors, strict=True)
-                if vec is not None
-            ]
-            failed = [rid for rid, vec in zip(ids, vectors, strict=True) if vec is None]
+            )
+
+        vectors = _embed_with_fallback(gateway, texts, log)
+        stored = [
+            {
+                "workspace_id": ws,
+                "record_id": rid,
+                "model_id": CURRENT_EMBEDDING_MODEL,
+                "embedding": vec,
+            }
+            for rid, vec in zip(ids, vectors, strict=True)
+            if vec is not None
+        ]
+        failed = [rid for rid, vec in zip(ids, vectors, strict=True) if vec is None]
+        with ctx.step() as (db, queue):
             if stored:
                 db.execute(pg_insert(RecordEmbedding).values(stored).on_conflict_do_nothing())
             if failed:
                 db.execute(
-                    pg_insert(RecordClassification).values(
+                    pg_insert(RecordClassification)
+                    .values(
                         [
                             {
-                                "workspace_id": ctx.job.workspace_id,
+                                "workspace_id": ws,
                                 "analysis_run_id": run_id,
                                 "record_id": rid,
                                 "status": "embedding_failed",
@@ -127,7 +133,10 @@ def embed_step(ctx: JobContext, run: RunContext) -> None:
                             for rid in failed
                         ]
                     )
+                    .on_conflict_do_nothing()
                 )
+            for entry in calls:
+                log_call(db, **entry)
             done += len(batch)
             queue.checkpoint(ctx.job, {"step": "embed"}, {"step": "embed", "embedded": done})
 

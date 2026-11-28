@@ -36,7 +36,13 @@ from elucis.db.models import (
 )
 from elucis.db.models._common import CURRENT_EMBEDDING_MODEL
 from elucis.modules.analysis.context import RunContext
-from elucis.modules.analysis.tasks import OutputRuleError, TaskContext, run_task
+from elucis.modules.analysis.tasks import (
+    OutputRuleError,
+    TaskContext,
+    flush_calls,
+    register_prompts,
+    run_task,
+)
 from elucis.modules.insights.stats import theme_stats
 from elucis.workers.runtime import JobContext
 
@@ -177,9 +183,13 @@ def naming_rules(keys: list[str]) -> Any:
 
 
 def name_step(ctx: JobContext, run: RunContext) -> None:
+    """Per theme: read its evidence (short transaction) -> CP-03 (no transaction open) ->
+    write the name, the citations and the call records together."""
     ws, run_id = ctx.job.workspace_id, run.run_id
+    with ctx.step() as (db, _queue):
+        prompt_ids = register_prompts(db, CP03)
     while True:
-        with ctx.step() as (db, queue):
+        with ctx.step() as (db, _queue):
             theme = db.execute(
                 select(Theme)
                 .where(
@@ -192,53 +202,49 @@ def name_step(ctx: JobContext, run: RunContext) -> None:
             ).scalar_one_or_none()
             if theme is None:
                 return
+            theme_id = theme.id
             evidence = evidence_for(db, ws, run_id, theme)
-            keys = [f"E{i + 1}" for i in range(len(evidence))]
-            taken = (
+            taken = list(
                 db.execute(
                     select(Theme.name).where(
                         Theme.workspace_id == ws,
                         Theme.first_run_id == run_id,
                         Theme.description.is_not(None),
                     )
-                )
-                .scalars()
-                .all()
+                ).scalars()
             )
-            content = (
-                (f"Product: {run.product}\n" if run.product else "")
-                + (
-                    f"Names already used for other themes (do not repeat): {', '.join(taken)}\n"
-                    if taken
-                    else ""
-                )
-                + "Records:\n"
-                + render_records(list(zip(keys, [t for _, t in evidence], strict=True)))
-            )
-            tc = TaskContext(db, run.gateway, ws, ctx.job.id, run.chat_model)
-            out = run_task(tc, CP03, content, Cp03Out, naming_rules(keys)) if evidence else None
-            cited: list[uuid.UUID] = []
-            if out is not None:
-                by_key = dict(zip(keys, [rid for rid, _ in evidence], strict=True))
-                cited = list(dict.fromkeys(by_key[k] for k in out.cited_ids))
-                values = {
-                    "name": out.name.strip().strip('"'),
-                    "description": out.description.strip(),
-                }
-            else:
-                values = {"description": ""}  # keeps "Unnamed theme <n>" (D04 CP-03 fallback)
+        keys = [f"E{i + 1}" for i in range(len(evidence))]
+        lines = [f"Product: {run.product}"] if run.product else []
+        if taken:
+            lines.append(f"Names already used for other themes (do not repeat): {', '.join(taken)}")
+        lines += [
+            "Records:",
+            render_records(list(zip(keys, [t for _, t in evidence], strict=True))),
+        ]
+        content = "\n".join(lines)
+        tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+        out = run_task(tc, CP03, content, Cp03Out, naming_rules(keys)) if evidence else None
+        cited: list[uuid.UUID] = []
+        if out is not None:
+            by_key = dict(zip(keys, [rid for rid, _ in evidence], strict=True))
+            cited = list(dict.fromkeys(by_key[k] for k in out.cited_ids))
+            values = {"name": out.name.strip().strip('"'), "description": out.description.strip()}
+        else:
+            values = {"description": ""}  # keeps "Unnamed theme <n>" (D04 CP-03 fallback)
+        with ctx.step() as (db, queue):
             db.execute(
-                update(Theme).where(Theme.workspace_id == ws, Theme.id == theme.id).values(**values)
+                update(Theme).where(Theme.workspace_id == ws, Theme.id == theme_id).values(**values)
             )
             db.execute(
                 update(ThemeRunStats)
                 .where(
                     ThemeRunStats.workspace_id == ws,
                     ThemeRunStats.analysis_run_id == run_id,
-                    ThemeRunStats.theme_id == theme.id,
+                    ThemeRunStats.theme_id == theme_id,
                 )
                 .values(cited_record_ids=cited)
             )
+            flush_calls(db, tc)
             queue.checkpoint(ctx.job, {"step": "name"}, {"step": "name"})
 
 
