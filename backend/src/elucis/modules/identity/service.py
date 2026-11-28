@@ -21,6 +21,7 @@ from elucis.core.errors import (
     ConflictError,
     EmailTakenError,
     EncryptionUnavailableError,
+    GeminiNotConfiguredError,
     InvalidCredentialsError,
     NotFoundError,
     TooManyAttemptsError,
@@ -204,8 +205,10 @@ def me(db: Session, settings: Settings, principal: Principal) -> MeOut:
 
 
 # ---------------------------------------------------------------- workspaces
-def _workspace_out(ws: Workspace, role: str) -> WorkspaceOut:
+def _workspace_out(ws: Workspace, role: str, settings: Settings) -> WorkspaceOut:
     return WorkspaceOut(
+        gemini_fallback=ws.gemini_fallback,
+        gemini_available=settings.gemini_configured,
         id=ws.id,
         name=ws.name,
         description=ws.description,
@@ -247,37 +250,66 @@ def create_workspace(
         target_id=ws.id,
         ip=principal.ip,
     )
-    return _workspace_out(ws, "owner")
+    return _workspace_out(ws, "owner", settings)
 
 
 def list_workspaces(
-    db: Session, principal: Principal, *, limit: int, cursor: str | None
+    db: Session, settings: Settings, principal: Principal, *, limit: int, cursor: str | None
 ) -> Page[WorkspaceOut]:
     rows = repo.workspaces_for_user(db, principal.user_id, after=decode_cursor(cursor), limit=limit)
     page, more = rows[:limit], len(rows) > limit
     return Page(
-        items=[_workspace_out(ws, role) for ws, role in page],
+        items=[_workspace_out(ws, role, settings) for ws, role in page],
         next_cursor=encode_cursor(page[-1][0].created_at, page[-1][0].id) if more else None,
     )
 
 
-def get_workspace(db: Session, ctx: WorkspaceContext) -> WorkspaceOut:
+def get_workspace(db: Session, settings: Settings, ctx: WorkspaceContext) -> WorkspaceOut:
     ws = repo.workspace(db, ctx.workspace_id)
     if ws is None:
         raise NotFoundError()
-    return _workspace_out(ws, ctx.role)
+    return _workspace_out(ws, ctx.role, settings)
 
 
-def update_workspace(db: Session, ctx: WorkspaceContext, data: WorkspacePatch) -> WorkspaceOut:
+def update_workspace(
+    db: Session, settings: Settings, ctx: WorkspaceContext, data: WorkspacePatch
+) -> WorkspaceOut:
     values: dict[str, Any] = data.model_dump(exclude_unset=True)
     if "name" in values and values["name"] is None:
         raise ValidationFailedError(details=[{"field": "name", "issue": "required"}])
     if values.get("glossary") is None and "glossary" in values:
         values["glossary"] = {}
+    backup = values.pop("gemini_fallback", None)
+    if backup is not None:
+        _set_backup(db, settings, ctx, enabled=backup)
     if values:
         repo.update_workspace(db, ctx.workspace_id, values)
         db.expire_all()
-    return get_workspace(db, ctx)
+    return get_workspace(db, settings, ctx)
+
+
+def _set_backup(db: Session, settings: Settings, ctx: WorkspaceContext, *, enabled: bool) -> None:
+    """Owner's switch for the Gemini backup (IMP-38): refused without a configured key,
+    audited on every change."""
+    if enabled and not settings.gemini_configured:
+        raise GeminiNotConfiguredError()
+    ws = repo.workspace(db, ctx.workspace_id)
+    if ws is None:
+        raise NotFoundError()
+    if ws.gemini_fallback == enabled:
+        return
+    repo.update_workspace(db, ctx.workspace_id, {"gemini_fallback": enabled})
+    record(
+        db,
+        action="workspace.gemini_fallback_changed",
+        workspace_id=ctx.workspace_id,
+        actor_user_id=ctx.principal.user_id,
+        target_type="workspace",
+        target_id=ctx.workspace_id,
+        details={"enabled": enabled},
+        ip=ctx.principal.ip,
+    )
+    db.expire_all()
 
 
 def request_deletion(

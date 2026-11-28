@@ -13,12 +13,16 @@ EMBED_BATCH_SIZE = 64  # D03 SVC-08 (tuned in EXP-04)
 EMBED_RETRIES = 2  # DR-38
 
 
-def run_config(settings: Settings) -> dict[str, Any]:
+def run_config(settings: Settings, *, backup: bool = False) -> dict[str, Any]:
     return {
         "embedding_model": CURRENT_EMBEDDING_MODEL,
         "embedding_dimension": EMBEDDING_DIMENSION,
         "embed_batch_size": EMBED_BATCH_SIZE,
         "chat_model": settings.ollama_chat_model,
+        # Optional backup for chat calls (IMP-38), as it was when the run started.
+        "fallback": f"gemini:{settings.gemini_model}"
+        if backup and settings.gemini_configured
+        else None,
     }
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from elucis.modules.analysis.gateway import ModelGateway
+from elucis.modules.analysis.gateway import ChatGateway, ModelGateway
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,3 +15,5 @@ class RunContext:
     gateway: ModelGateway
     chat_model: str
     product: str  # product name, description and users, or "" when not filled in
+    fallback: ChatGateway | None = None  # optional backup for chat calls (IMP-38)
+    fallback_model: str | None = None

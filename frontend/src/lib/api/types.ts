@@ -173,6 +173,10 @@ export interface WorkspaceOut {
   glossary: Record<string, string>;
   role: Role;
   created_at: string;
+  /** Owner's switch for the optional Gemini backup (IMP-38). */
+  gemini_fallback: boolean;
+  /** The server has a Gemini key configured. */
+  gemini_available: boolean;
 }
 
 export interface WorkspacePatch {
@@ -182,6 +186,7 @@ export interface WorkspacePatch {
   product_description?: string | null;
   target_users?: string | null;
   glossary?: Record<string, string>;
+  gemini_fallback?: boolean;
 }
 
 export interface MemberOut {

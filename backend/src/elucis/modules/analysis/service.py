@@ -83,10 +83,12 @@ def start_run(
         raise NoAnalysableRecordsError()
     check_models(settings)
 
-    config = run_config(settings)
-    previous = db.execute(
-        select(Workspace.current_analysis_run_id).where(Workspace.id == ctx.workspace_id)
-    ).scalar_one()
+    previous, backup = db.execute(
+        select(Workspace.current_analysis_run_id, Workspace.gemini_fallback).where(
+            Workspace.id == ctx.workspace_id
+        )
+    ).one()
+    config = run_config(settings, backup=bool(backup))
     run_id = uuid.uuid4()
     job_id = enqueue_job(
         db,

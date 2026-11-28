@@ -106,6 +106,8 @@ class Workspace(Base):
     glossary: Mapped[dict[str, Any]] = mapped_column(Json, server_default=EMPTY_OBJECT)
     customer_key_secret: Mapped[bytes] = mapped_column(BYTEA)  # encrypted with the app key
     current_analysis_run_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Optional Gemini backup for chat calls, off by default (migration 0004, IMP-38).
+    gemini_fallback: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_by: Mapped[uuid.UUID] = mapped_column(Uuid)
     created_at: Mapped[datetime] = mapped_column(Timestamp, server_default=NOW)
 

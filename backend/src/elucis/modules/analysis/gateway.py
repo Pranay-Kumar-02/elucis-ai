@@ -21,15 +21,8 @@ from elucis.db.models import LlmCallRecord
 T = TypeVar("T", bound=BaseModel)
 
 
-class ModelGateway(Protocol):
-    def embed(
-        self,
-        texts: list[str],
-        *,
-        model: str | None = None,
-        expected_dimension: int | None = None,
-        keep_alive: str | None = None,
-    ) -> EmbedResult: ...
+class ChatGateway(Protocol):
+    """What a chat backend offers: the local model, or the optional backup (IMP-38)."""
 
     def chat_json(
         self,
@@ -41,6 +34,19 @@ class ModelGateway(Protocol):
     ) -> tuple[T, CallStats]: ...
 
     def close(self) -> None: ...
+
+
+class ModelGateway(ChatGateway, Protocol):
+    """The local runtime: chat and embeddings (embeddings never leave the machine)."""
+
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        model: str | None = None,
+        expected_dimension: int | None = None,
+        keep_alive: str | None = None,
+    ) -> EmbedResult: ...
 
 
 def input_hash(parts: list[str]) -> bytes:
@@ -67,6 +73,7 @@ def log_call(
     attempt: int = 1,
     stats: CallStats | None = None,
     prompt_version_id: uuid.UUID | None = None,
+    provider: str = "ollama",
 ) -> None:
     db.execute(
         insert(LlmCallRecord)
@@ -84,6 +91,7 @@ def log_call(
             total_ms=_ms(stats.total_ms) if stats else None,
             attempt=attempt,
             outcome=outcome,
+            provider=provider,
             job_id=job_id,
         )
     )

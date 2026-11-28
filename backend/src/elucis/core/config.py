@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     ollama_num_ctx: int = Field(default=4096, ge=512)
     embedding_dimension: int = Field(default=1024, ge=1)  # D07 assumption, measured by EXP-04
 
+    # ---- optional cloud backup for chat calls (IMP-38); off unless a workspace enables it ----
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_timeout_s: float = Field(default=60.0, gt=0)
+
+    @property
+    def gemini_configured(self) -> bool:
+        return self.gemini_api_key is not None and bool(self.gemini_api_key.get_secret_value())
+
     # ---- ingestion ----
     upload_dir: Path = REPO_ROOT / "data" / "uploads"
     preview_rows: int = Field(default=20, ge=1, le=200)

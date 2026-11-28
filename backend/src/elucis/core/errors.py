@@ -144,6 +144,12 @@ class EncryptionUnavailableError(AppError):
     message = "Encryption is not configured (APP_ENCRYPTION_KEY)."
 
 
+class GeminiNotConfiguredError(AppError):
+    status_code = HTTPStatus.UNPROCESSABLE_ENTITY
+    code = "gemini_not_configured"
+    message = "The Gemini backup needs GEMINI_API_KEY in the server's .env file."
+
+
 class RunInProgressError(AppError):
     status_code = HTTPStatus.CONFLICT
     code = "run_in_progress"

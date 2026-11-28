@@ -24,6 +24,8 @@ const workspace = {
   glossary: {},
   role: "owner",
   created_at: "2026-11-26T09:00:00Z",
+  gemini_fallback: false,
+  gemini_available: false,
 };
 
 const members = {
@@ -164,5 +166,54 @@ describe("workspaces", () => {
     const headers = new Headers(call?.[1]?.headers);
     expect(headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
     expect(headers.get("X-CSRF-Token")).toBe("csrf-test-token");
+  });
+
+  it("keeps the Gemini backup off and explains why when the server has no key", async () => {
+    mockFetch({
+      "/api/v1/health": () => json(healthyResponse),
+      [`/api/v1/workspaces/${workspaceId}`]: () => json(workspace),
+    });
+    await renderSignedIn("/settings/general");
+    const toggle = await screen.findByRole("switch", {
+      name: /Use Google Gemini as a backup/,
+    });
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/GEMINI_API_KEY is not set on the server/)).toBeInTheDocument();
+    expect(screen.getByText(/human reviewers may read it/)).toBeInTheDocument();
+  });
+
+  it("lets an Owner turn the Gemini backup on when a key is configured", async () => {
+    let current = { ...workspace, gemini_available: true };
+    const fetchMock = mockFetch({
+      "/api/v1/health": () => json(healthyResponse),
+      [`/api/v1/workspaces/${workspaceId}`]: (_path, init) => {
+        if (init?.method === "PATCH") current = { ...current, gemini_fallback: true };
+        return json(current);
+      },
+    });
+    await renderSignedIn("/settings/general");
+    const toggle = await screen.findByRole("switch", { name: /Use Google Gemini as a backup/ });
+    expect(toggle).toBeEnabled();
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: /Use Google Gemini as a backup/ })).toBeChecked();
+    });
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+    expect(jsonBody(patch?.[1])).toEqual({ gemini_fallback: true });
+  });
+
+  it("shows other roles the backup setting read-only", async () => {
+    mockFetch({
+      "/api/v1/auth/me": () => json(asRole("editor")),
+      "/api/v1/health": () => json(healthyResponse),
+      [`/api/v1/workspaces/${workspaceId}`]: () =>
+        json({ ...workspace, role: "editor", gemini_available: true, gemini_fallback: true }),
+    });
+    await renderSignedIn("/settings/general");
+    const toggle = await screen.findByRole("switch", { name: /Use Google Gemini as a backup/ });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/Only Owners can change this/)).toBeInTheDocument();
   });
 });

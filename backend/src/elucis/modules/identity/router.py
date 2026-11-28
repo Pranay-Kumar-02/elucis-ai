@@ -86,20 +86,23 @@ def create_workspace(
 def list_workspaces(
     principal: PrincipalDep,
     db: DbDep,
+    settings: SettingsDep,
     limit: LimitQuery = DEFAULT_LIMIT,
     cursor: CursorQuery = None,
 ) -> Page[WorkspaceOut]:
-    return service.list_workspaces(db, principal, limit=limit, cursor=cursor)
+    return service.list_workspaces(db, settings, principal, limit=limit, cursor=cursor)
 
 
 @workspaces.get("/{ws}", summary="API-07 Workspace and product profile")
-def get_workspace(ctx: ViewerDep, db: DbDep) -> WorkspaceOut:
-    return service.get_workspace(db, ctx)
+def get_workspace(ctx: ViewerDep, db: DbDep, settings: SettingsDep) -> WorkspaceOut:
+    return service.get_workspace(db, settings, ctx)
 
 
 @workspaces.patch("/{ws}", summary="API-08 Edit workspace and product profile")
-def update_workspace(data: WorkspacePatch, ctx: OwnerDep, db: DbDep) -> WorkspaceOut:
-    return service.update_workspace(db, ctx, data)
+def update_workspace(
+    data: WorkspacePatch, ctx: OwnerDep, db: DbDep, settings: SettingsDep
+) -> WorkspaceOut:
+    return service.update_workspace(db, settings, ctx, data)
 
 
 @workspaces.delete("/{ws}", status_code=status.HTTP_202_ACCEPTED, summary="API-09 Delete workspace")

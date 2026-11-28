@@ -96,7 +96,15 @@ def classify_step(ctx: JobContext, run: RunContext) -> None:
             batch = db.execute(_pending(ws, run_id)).all()
         if not batch:
             return
-        tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+        tc = TaskContext(
+            run.gateway,
+            ws,
+            ctx.job.id,
+            run.chat_model,
+            prompt_ids,
+            fallback=run.fallback,
+            fallback_model=run.fallback_model,
+        )
         labels = classify_batch(tc, [r.processed_text or "" for r in batch])
         rows = []
         for record, label in zip(batch, labels, strict=True):

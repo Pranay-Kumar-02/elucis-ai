@@ -31,7 +31,7 @@ from elucis.ai.ollama import InvalidModelOutputError
 from elucis.ai.prompts import PromptSpec
 from elucis.core.errors import ModelUnavailableError
 from elucis.db.models import PromptVersion
-from elucis.modules.analysis.gateway import ModelGateway, log_call
+from elucis.modules.analysis.gateway import ChatGateway, ModelGateway, log_call
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,9 @@ class TaskContext:
     model: str
     prompt_ids: dict[str, uuid.UUID]
     pending: list[dict[str, Any]] = field(default_factory=list)
+    # Optional backup (IMP-38): used only after the local model failed this call.
+    fallback: ChatGateway | None = None
+    fallback_model: str | None = None
 
 
 def register_prompts(db: Session, *specs: PromptSpec) -> dict[str, uuid.UUID]:
@@ -106,6 +109,62 @@ def run_task[T: BaseModel](
     *,
     sleep: Callable[[float], None] = time.sleep,
 ) -> T | None:
+    """The local model first; the workspace's backup (if enabled) only when the local model
+    gave no valid answer after its retries, or could not be reached at all."""
+    try:
+        result = _attempts(
+            tc, tc.gateway, tc.model, "ollama", spec, user_content, schema, check, sleep
+        )
+    except ModelUnavailableError:
+        if tc.fallback is None:
+            raise
+        logger.warning(
+            "local model unavailable; trying the backup", extra={"call_id": spec.call_id}
+        )
+        try:
+            return _attempts(
+                tc,
+                tc.fallback,
+                tc.fallback_model or "",
+                "gemini",
+                spec,
+                user_content,
+                schema,
+                check,
+                sleep,
+            )
+        except ModelUnavailableError:
+            raise  # both down: the step fails and the job retries later
+    if result is not None or tc.fallback is None:
+        return result
+    logger.warning("local model output invalid; trying the backup", extra={"call_id": spec.call_id})
+    try:
+        return _attempts(
+            tc,
+            tc.fallback,
+            tc.fallback_model or "",
+            "gemini",
+            spec,
+            user_content,
+            schema,
+            check,
+            sleep,
+        )
+    except ModelUnavailableError:
+        return None  # the backup is down too: the caller's own fallback applies
+
+
+def _attempts[T: BaseModel](  # noqa: PLR0917 - one call's full retry policy
+    tc: TaskContext,
+    gateway: ChatGateway,
+    model: str,
+    provider: str,
+    spec: PromptSpec,
+    user_content: str,
+    schema: type[T],
+    check: Callable[[T], None] | None,
+    sleep: Callable[[float], None],
+) -> T | None:
     version_id = tc.prompt_ids[spec.call_id]
     messages = [
         {"role": "system", "content": spec.system},
@@ -115,10 +174,10 @@ def run_task[T: BaseModel](
     while True:
         attempt += 1
         try:
-            result, stats = tc.gateway.chat_json(
+            result, stats = gateway.chat_json(
                 messages,
                 schema,
-                model=tc.model,
+                model=model,
                 think=False,
                 temperature=0.0,
                 num_predict=spec.max_output_tokens,
@@ -126,17 +185,29 @@ def run_task[T: BaseModel](
             if check is not None:
                 check(result)
         except ModelUnavailableError:
-            _log(tc, spec, version_id, user_content, "error", attempt)
+            _log(
+                tc, spec, version_id, user_content, "error", attempt, model=model, provider=provider
+            )
             if unavailable >= TRANSPORT_RETRIES:
                 raise
             sleep(TRANSPORT_WAIT_S[unavailable])
             unavailable += 1
             continue
         except (InvalidModelOutputError, OutputRuleError) as exc:
-            _log(tc, spec, version_id, user_content, "invalid_output", attempt)
+            _log(
+                tc,
+                spec,
+                version_id,
+                user_content,
+                "invalid_output",
+                attempt,
+                model=model,
+                provider=provider,
+            )
             if invalid >= INVALID_RETRIES:
                 logger.warning(
-                    "model output invalid after retries", extra={"call_id": spec.call_id}
+                    "model output invalid after retries",
+                    extra={"call_id": spec.call_id, "provider": provider},
                 )
                 return None
             invalid += 1
@@ -149,7 +220,9 @@ def run_task[T: BaseModel](
                 },
             ]
             continue
-        _log(tc, spec, version_id, user_content, "ok", attempt, stats)
+        _log(
+            tc, spec, version_id, user_content, "ok", attempt, stats, model=model, provider=provider
+        )
         return result
 
 
@@ -161,17 +234,21 @@ def _log(  # noqa: PLR0917 - internal helper
     outcome: str,
     attempt: int,
     stats: object = None,
+    *,
+    model: str,
+    provider: str,
 ) -> None:
     tc.pending.append(
         {
             "workspace_id": tc.workspace_id,
             "job_id": tc.job_id,
             "call_id": spec.call_id,
-            "model": tc.model,
+            "model": model,
             "inputs": [spec.system, content],
             "outcome": outcome,
             "attempt": attempt,
             "stats": stats,
             "prompt_version_id": version_id,
+            "provider": provider,
         }
     )

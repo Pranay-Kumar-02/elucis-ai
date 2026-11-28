@@ -222,7 +222,15 @@ def name_step(ctx: JobContext, run: RunContext) -> None:
             render_records(list(zip(keys, [t for _, t in evidence], strict=True))),
         ]
         content = "\n".join(lines)
-        tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+        tc = TaskContext(
+            run.gateway,
+            ws,
+            ctx.job.id,
+            run.chat_model,
+            prompt_ids,
+            fallback=run.fallback,
+            fallback_model=run.fallback_model,
+        )
         out = run_task(tc, CP03, content, Cp03Out, naming_rules(keys)) if evidence else None
         cited: list[uuid.UUID] = []
         if out is not None:

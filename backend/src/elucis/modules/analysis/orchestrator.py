@@ -25,12 +25,14 @@ from typing import Any
 
 from sqlalchemy import and_, func, select, update
 
+from elucis.ai.gemini import GeminiClient
 from elucis.ai.ollama import OllamaClient
 from elucis.core.config import Settings
 from elucis.db.models import (
     AggregatedRequest,
     AnalysisRun,
     FeedbackRecord,
+    LlmCallRecord,
     RecordClassification,
     RecordEmbedding,
     RequestMembership,
@@ -42,7 +44,7 @@ from elucis.db.models._common import CURRENT_EMBEDDING_MODEL
 from elucis.modules.analysis.classify import classify_step
 from elucis.modules.analysis.context import RunContext
 from elucis.modules.analysis.embedding import embed_step
-from elucis.modules.analysis.gateway import ModelGateway
+from elucis.modules.analysis.gateway import ChatGateway, ModelGateway
 from elucis.modules.analysis.requests import archive_earlier_requests, requests_step
 from elucis.modules.analysis.themes import (
     archive_earlier_themes,
@@ -70,17 +72,34 @@ def default_gateway(settings: Settings) -> ModelGateway:
     return OllamaClient(settings)
 
 
+def default_fallback(settings: Settings) -> ChatGateway:
+    return GeminiClient(settings)
+
+
 def run_analysis(
     ctx: JobContext,
     settings: Settings,
     gateway_factory: Callable[[Settings], ModelGateway] = default_gateway,
+    fallback_factory: Callable[[Settings], ChatGateway] = default_fallback,
 ) -> str:
     run_id = uuid.UUID(str(ctx.job.payload["analysis_run_id"]))
     gateway = gateway_factory(settings)
+    fallback: ChatGateway | None = None
     try:
         if not _begin(ctx, run_id):
             return "succeeded"  # already finished, or removed with its workspace
-        run = RunContext(run_id, gateway, settings.ollama_chat_model, _product(ctx))
+        product, wants_backup = _workspace_profile(ctx)
+        # The backup exists only if an Owner switched it on AND a key is configured (IMP-38).
+        if wants_backup and settings.gemini_configured:
+            fallback = fallback_factory(settings)
+        run = RunContext(
+            run_id,
+            gateway,
+            settings.ollama_chat_model,
+            product,
+            fallback=fallback,
+            fallback_model=settings.gemini_model if fallback else None,
+        )
         names = [name for name, _ in STEPS]
         resume_at = (
             names.index(ctx.job.cursor["step"]) if ctx.job.cursor.get("step") in names else 0
@@ -99,24 +118,29 @@ def run_analysis(
         raise
     finally:
         gateway.close()
+        if fallback is not None:
+            fallback.close()
 
 
-def _product(ctx: JobContext) -> str:
-    """The workspace's product profile, as context for naming (CP-03, CP-04)."""
+def _workspace_profile(ctx: JobContext) -> tuple[str, bool]:
+    """The product profile (context for CP-03 and CP-04) and the backup switch."""
     with ctx.step() as (db, _queue):
         ws = db.execute(
             select(
-                Workspace.product_name, Workspace.product_description, Workspace.target_users
+                Workspace.product_name,
+                Workspace.product_description,
+                Workspace.target_users,
+                Workspace.gemini_fallback,
             ).where(Workspace.id == ctx.job.workspace_id)
         ).one_or_none()
     if ws is None:
-        return ""
+        return "", False
     parts = [
         ws.product_name,
         ws.product_description,
         f"Users: {ws.target_users}" if ws.target_users else None,
     ]
-    return " - ".join(p for p in parts if p)
+    return " - ".join(p for p in parts if p), bool(ws.gemini_fallback)
 
 
 def _begin(ctx: JobContext, run_id: uuid.UUID) -> bool:
@@ -198,6 +222,19 @@ def run_report(db: Any, ws: uuid.UUID, run_id: uuid.UUID) -> dict[str, Any]:
                     rc.workspace_id == ws, rc.analysis_run_id == run_id, rc.status == "classified"
                 )
                 .group_by(rc.category)
+            ).all()
+        },
+        "calls_by_provider": {
+            str(provider): int(n)
+            for provider, n in db.execute(
+                select(LlmCallRecord.provider, func.count())
+                .where(
+                    LlmCallRecord.workspace_id == ws,
+                    LlmCallRecord.job_id
+                    == select(AnalysisRun.job_id).where(AnalysisRun.id == run_id).scalar_subquery(),
+                    LlmCallRecord.outcome == "ok",
+                )
+                .group_by(LlmCallRecord.provider)
             ).all()
         },
         "steps": [name for name, _ in STEPS],

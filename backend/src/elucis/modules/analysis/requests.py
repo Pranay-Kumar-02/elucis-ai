@@ -114,7 +114,15 @@ def requests_step(ctx: JobContext, run: RunContext) -> None:
         for r in rows
         if is_candidate(r.category, r.processed_text or "")
     ]
-    tc = TaskContext(run.gateway, ws, ctx.job.id, run.chat_model, prompt_ids)
+    tc = TaskContext(
+        run.gateway,
+        ws,
+        ctx.job.id,
+        run.chat_model,
+        prompt_ids,
+        fallback=run.fallback,
+        fallback_model=run.fallback_model,
+    )
     asks: list[str] = []
     low: list[bool] = []
     groups: list[tuple[str, list[int]]] = []

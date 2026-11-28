@@ -199,6 +199,13 @@ After each step the job's cursor becomes `{"step": "<next step>"}`, so a retry r
 - An unreachable Ollama is retried 2 times, then the exception is raised, so the job retries later.
 - Every attempt is logged in `llm_call_records`: model, prompt version, input hash, tokens, milliseconds, outcome. Prompt and reply texts are **not** stored.
 
+**Optional Gemini backup (IMP-38):**
+- `ai/gemini.py: GeminiClient` speaks Gemini's REST API (`generateContent`) and offers the same `chat_json` as the Ollama client.
+- In `run_task`, it is used only when `TaskContext.fallback` is set: the workspace switch is on (Settings › General › AI backup) **and** `GEMINI_API_KEY` is set. Then it is tried after the local model failed that call.
+- Its attempts are logged with `provider = 'gemini'`.
+- Debug: `SELECT provider, call_id, outcome, count(*) FROM llm_call_records WHERE job_id = '<job>' GROUP BY 1, 2, 3;`.
+- Check the key works: `uv run python scripts/check_gemini.py`.
+
 Fallbacks:
 - CP-02 batch invalid → one record at a time → `unclassified`.
 - CP-03 invalid → "Unnamed theme n".

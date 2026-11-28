@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useActiveWorkspace } from "@/features/workspaces/active";
+import { AiBackupCard } from "@/features/workspaces/AiBackupCard";
 import { NoWorkspace } from "@/features/workspaces/NoWorkspace";
 import {
   useDeleteWorkspace,
@@ -242,6 +243,7 @@ export function WorkspaceSettingsPage() {
         <div className="space-y-6">
           {/* Keyed by workspace so switching workspaces resets the form. */}
           <GeneralForm key={workspace.data.id} workspace={workspace.data} />
+          <AiBackupCard workspace={workspace.data} />
           {workspace.data.role === "owner" && (
             <DangerZone key={`danger-${workspace.data.id}`} workspace={workspace.data} />
           )}

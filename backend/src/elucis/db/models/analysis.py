@@ -72,6 +72,7 @@ class LlmCallRecord(Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "id", name=conv("uq_llm_call_records_workspace_id_id")),
         check_in("llm_call_records", "outcome", "ok", "invalid_output", "timeout", "error"),
+        check_in("llm_call_records", "provider", "ollama", "gemini"),  # migration 0004
         workspace_fk("llm_call_records"),
         ForeignKeyConstraint(
             ["prompt_version_id"],
@@ -98,6 +99,7 @@ class LlmCallRecord(Base):
     total_ms: Mapped[int | None] = mapped_column(Integer)
     attempt: Mapped[int] = mapped_column(SmallInteger, server_default=text("1"))
     outcome: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(Text, server_default=text("'ollama'"))  # IMP-38
     job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     created_at: Mapped[datetime] = mapped_column(Timestamp, server_default=NOW)
 

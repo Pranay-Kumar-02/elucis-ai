@@ -16,7 +16,16 @@ from sqlalchemy.orm import Session
 from elucis.db.models import AuditLog
 
 ALLOWED_DETAIL_KEYS = frozenset(
-    {"reason", "required_role", "route", "role", "previous_role", "workspace_name", "job_id"}
+    {
+        "reason",
+        "required_role",
+        "route",
+        "role",
+        "previous_role",
+        "workspace_name",
+        "job_id",
+        "enabled",
+    }
 )
 
 

@@ -86,6 +86,7 @@ class WorkspacePatch(StrictModel):
     product_description: Annotated[str, StringConstraints(max_length=2000)] | None = None
     target_users: Annotated[str, StringConstraints(max_length=500)] | None = None
     glossary: Annotated[dict[GlossaryTerm, GlossaryDefinition], Field(max_length=200)] | None = None
+    gemini_fallback: bool | None = None  # IMP-38; refused without GEMINI_API_KEY
 
 
 class WorkspaceOut(BaseModel):
@@ -98,6 +99,12 @@ class WorkspaceOut(BaseModel):
     glossary: dict[str, str]
     role: Role  # the caller's role in this workspace
     created_at: datetime
+    gemini_fallback: bool = Field(
+        default=False, description="Owner's switch: Gemini as a backup for chat calls (IMP-38)"
+    )
+    gemini_available: bool = Field(
+        default=False, description="GEMINI_API_KEY is configured on this server"
+    )
 
 
 class DeleteWorkspaceIn(StrictModel):
